@@ -34,6 +34,8 @@ jobs:
           # repo_path: https://github.com/${{ github.repository }}
           repo_path: ./
           policy_file: check-github-actions
-          policy_purl: pkg:github/${{ github.repository }}@${{ github.sha }}
+          # policy_purl: pkg:github/${{ github.repository }}@${{ github.sha }}
+          # policy_purl: pkg:github/oracle/coherence-cli@.*
+          policy_purl: pkg:github/vasac/coherence-cli@.*
           reports_retention_days: 90
 
