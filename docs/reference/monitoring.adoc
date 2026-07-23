@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 
-    Copyright (c) 2025 Oracle and/or its affiliates.
+    Copyright (c) 2025, 2026 Oracle and/or its affiliates.
     Licensed under the Universal Permissive License v 1.0 as shown at
     https://oss.oracle.com/licenses/upl.
 
@@ -13,30 +13,25 @@
 == Local Monitoring
 
 === Overview
-There are various commands that allow you to initialize, start and stop a local monitoring stack using Grafana and Prometheus. This
-allows you gain insight into your local development clusters using the pre-built dashboards.
 
-After using `cohctl monitoring init`, the directory `/Users/timbo/.cohctl/monitoring` contains a complete `docker compose` project.
-You can manually start/ stop using `docker compose` from that directory, or use the <<start-monitoring,`start monitoring`>> or <<stop-monitoring,`stop monitoring`>> convenience commands. Prometheus scrapes local metrics ports from 9612 -> 9169 for any Coherence clusters with metrics enabled.
+The monitoring commands initialize, start, inspect, and stop a local Grafana and Prometheus stack for development clusters.
+Prometheus scrapes local metrics ports from 9612 through 9169 for Coherence clusters with metrics enabled.
+For example, `cohctl start cluster my-cluster -t 9612` starts a local cluster with metrics enabled.
 
-After you start the monitoring you can start a local cluster using `cohctl start cluster my-cluster -t 9612` to enable metrics.
+The generated stack requires Docker Compose V2 or newer.
+By default, Grafana and Prometheus bind only to `127.0.0.1`.
+Prometheus is not authenticated, and this stack is not intended for production use.
 
-See the Coherence documentation to {commercial-docs-base-url}/manage/using-coherence-metrics.html[setup up Coherence metrics] on your own cluster.
+If you are running a Coherence version before 14.1.2-0-0 or 25.03, set the following property on each cluster member so it emits the metric names used by the current dashboards:
 
-If you are running a Coherence version before 14.1.2-0-0 or 25.03, you must set the following property on each
-cluster member to emit the new style metrics used by the latest dashboards.
+* `-Dcoherence.metrics.legacy.names=false`
 
-- `-Dcoherence.metrics.legacy.names=false`.
+The available commands are:
 
-If you  have a `docker` version installed and running on your machine that doesn't include the updated `docker compose` command,
-you can use the `-D` option for `cohctl start manitoring` to use `docker-compose`.
-
-
-* <<init-monitoring, `cohctl init monitoring`>> - initialize local monitoring for Coherence
-* <<start-monitoring, `cohctl start monitoring`>> - starts the local monitoring stack
-* <<stop-monitoring, `cohctl stop monitoring`>> - stops the local monitoring stack
-* <<get-monitoring, `cohctl get monitoring`>> - gets the current monitoring stack status
-
+* <<init-monitoring,`cohctl init monitoring`>> — initialize local monitoring
+* <<start-monitoring,`cohctl start monitoring`>> — start Grafana and Prometheus
+* <<stop-monitoring,`cohctl stop monitoring`>> — stop Grafana and Prometheus
+* <<get-monitoring,`cohctl get monitoring`>> — report the current monitoring status
 
 [#init-monitoring]
 ==== Initialize Monitoring Stack
@@ -48,70 +43,65 @@ include::../../build/_output/docs-gen/init_monitoring.adoc[tag=text]
 cohctl init monitoring
 ----
 
-Output:
-[source,bash]
+Initialization downloads the dashboards and base configuration into a staging directory, validates them, and creates these authoritative local files under `~/.cohctl/monitoring`:
+
+* `docker-compose.cohctl.yaml` — generated Compose model used by cohctl
+* `monitoring.env` — persisted `COHCTL_MONITORING_BIND_ADDRESS`
+* `grafana-admin-password` — generated Grafana administrator password
+
+The monitoring configuration is downloaded from the `coherence-cli` Git tag that exactly matches the running cohctl release version.
+cohctl does not download monitoring configuration from the moving `main` branch or fall back to it.
+A development build without a valid semantic release version must be rebuilt with version metadata before it can initialize monitoring.
+Grafana dashboard definitions continue to come from the Coherence Operator dashboard repository.
+
+The password is generated from 32 random bytes, displayed once after successful initialization, and stored without a trailing newline.
+On POSIX systems cohctl requires the file to be owned by the current user with no group or other access; on Windows it inherits the ACL of the user's cohctl configuration directory.
+Routine start and status output never displays the password.
+
+Example abbreviated output:
+
+[source,text]
 ----
 This command will:
-1. Create a directory /Users/timbo/.cohctl/monitoring
-2. Download Grafana dashboards
-2. Download docker compose files
-3. Pull Grafana and Prometheus images
+1. Create or replace /Users/timbo/.cohctl/monitoring
+2. Download Grafana dashboards and monitoring configuration
+3. Generate a protected Grafana administrator password
+4. Pull Grafana and Prometheus images
 
 Are you sure you want to initialize monitoring? (y/n) y
-
-Ensuring directories...
-Downloading Grafana dashboards...
- -  cache-details-dashboard.json
- -  cache-store-details-dashboard.json
- -  caches-summary-dashboard.json
- -  coherence-dashboard-main.json
- -  elastic-data-summary-dashboard.json
- -  executor-details.json
- -  executors-summary.json
- -  federation-details-dashboard.json
- -  federation-summary-dashboard.json
- -  grpc-proxy-details-dashboard.json
- -  grpc-proxy-summary-dashboard.json
- -  http-servers-summary-dashboard.json
- -  machines-summary-dashboard.json
- -  member-details-dashboard.json
- -  members-summary-dashboard.json
- -  persistence-summary-dashboard.json
- -  proxy-server-detail-dashboard.json
- -  proxy-servers-summary-dashboard.json
- -  service-details-dashboard.json
- -  services-summary-dashboard.json
- -  topic-details-dashboard.json
- -  topic-subscriber-details.json
- -  topic-subscriber-group-details.json
- -  topics-summary-dashboard.json
-Downloading docker compose files...
- -  grafana.ini
- -  dashboards.yaml
- -  datasources.yaml
- -  docker-compose.yaml
- -  prometheus.yaml
-Pulling docker images...
-Issuing docker pull prom/prometheus:v2.53.4
-v2.53.4: Pulling from prom/prometheus
-Digest: sha256:502ad90314c7485892ce696cb14a99fceab9fc27af29f4b427f41bd39701a199
-Status: Image is up to date for prom/prometheus:v2.53.4
-docker.io/prom/prometheus:v2.53.4
-Issuing docker pull grafana/grafana:11.6.2
-11.6.2: Pulling from grafana/grafana
-Digest: sha256:a3464c5dadc2e16aaeb813aead8c852e81cc7bbfa851c66d96f016d5257b9848
-Status: Image is up to date for grafana/grafana:11.6.2
-docker.io/grafana/grafana:11.6.2
+...
 operation completed
 
-Note: You can change the grafana and prometheus image versions by editing:
-  /Users/timbo/.cohctl/monitoring/docker-compose.yaml
+Grafana administrator user: admin
+Grafana administrator password: <generated-password-shown-once>
+The password is stored in /Users/timbo/.cohctl/monitoring/grafana-admin-password and will not be displayed again.
+Generated compose configuration: /Users/timbo/.cohctl/monitoring/docker-compose.cohctl.yaml
 ----
 
-NOTE: The directory `/Users/timbo/.cohctl/monitoring` contains a complete `docker compose` project.
-You can manually start/ stop using `docker compose` from that directory, or use the `start monitoring` or `stop monitoring` convenience commands.
-You can also update the Grafana and Prometheus image versions in the `docker-compse.yaml` file in this directory.
+Re-running initialization generates a new password and replaces the complete monitoring directory only after all staging and image-pull work succeeds.
+Initialization refuses to replace the directory while its monitoring containers are running; stop them first.
 
+===== Select a bind address
+
+An unset `COHCTL_MONITORING_BIND_ADDRESS` defaults to `127.0.0.1`.
+To bind to a different IPv4 or IPv6 address, set it only when initializing:
+
+[source,bash]
+----
+COHCTL_MONITORING_BIND_ADDRESS=192.0.2.15 cohctl init monitoring
+----
+
+cohctl persists the validated address in `monitoring.env`; later inherited environment values cannot silently override it.
+Hostnames, CIDR notation, values containing ports, empty values, and malformed addresses are rejected.
+Specific non-loopback addresses produce an exposure warning.
+Explicit wildcard values `0.0.0.0` and `::` are supported but produce a stronger warning because both services become reachable on every matching interface and Prometheus has no authentication.
+
+===== Existing legacy installations
+
+An installation with `docker-compose.yaml` but none of the three generated-bundle files remains in legacy mode.
+cohctl inspects it, warns about known or missing Grafana credentials and exposed ports, and does not rewrite it implicitly.
+Re-run `cohctl init monitoring` to rotate to a generated password and loopback binding.
+A partial or corrupt generated bundle is treated as an error by `start` and `get`; cohctl never silently falls back to a legacy credential in that state.
 
 [#start-monitoring]
 ==== Start Monitoring Stack
@@ -123,32 +113,27 @@ include::../../build/_output/docs-gen/start_monitoring.adoc[tag=text]
 cohctl start monitoring
 ----
 
-Output:
+cohctl validates the complete security bundle and starts the authoritative generated Compose model:
+
+[source,text]
+----
+Issuing docker compose --env-file /Users/timbo/.cohctl/monitoring/monitoring.env -f /Users/timbo/.cohctl/monitoring/docker-compose.cohctl.yaml up -d
+...
+Open the Grafana dashboard at http://127.0.0.1:3000/d/coh-main/coherence-dashboard-main using administrator user admin.
+Read the password from /Users/timbo/.cohctl/monitoring/grafana-admin-password.
+----
+
+The standalone `docker-compose` command can be selected with `-D`, but it must report a V2 or newer version for a generated installation.
+
+To operate the generated project manually, always pass both authoritative files:
+
 [source,bash]
 ----
-Issuing docker compose -f /Users/timbo/.cohctl/monitoring/docker-compose.yaml up -d
- Network monitoring_coherence  Creating
- Network monitoring_coherence  Created
- Container monitoring-prometheus-1  Creating
- Container monitoring-grafana-1  Creating
- Container monitoring-grafana-1  Created
- Container monitoring-prometheus-1  Created
- Container monitoring-grafana-1  Starting
- Container monitoring-prometheus-1  Starting
- Container monitoring-prometheus-1  Started
- Container monitoring-grafana-1  Started
-
-Open the Grafana dashboard at http://localhost:3000/d/coh-main/coherence-dashboard-main, using admin/admin
-
-Issuing docker ps
-CONTAINER ID   IMAGE                     COMMAND                  CREATED                  STATUS                  PORTS                    NAMES
-03d14608f5e2   prom/prometheus:v2.53.4   "/bin/prometheus --c…"   Less than a second ago   Up Less than a second   0.0.0.0:9090->9090/tcp   monitoring-prometheus-1
-5dc519fd544b   grafana/grafana:11.6.2    "/run.sh"                Less than a second ago   Up Less than a second   0.0.0.0:3000->3000/tcp   monitoring-grafana-1
+cd ~/.cohctl/monitoring
+docker compose --env-file monitoring.env -f docker-compose.cohctl.yaml up -d
 ----
 
-Wait for around 30 seconds, before accessing the Grafana dashboard at http://localhost:3000/d/coh-main/coherence-dashboard-main using the username/password mentioned above.
-
-NOTE: This is local only setup for monitoring your development clusters, is not meant for production use.
+Wait for Grafana to become ready before signing in with administrator user `admin` and the generated password.
 
 [#stop-monitoring]
 ==== Stop Monitoring Stack
@@ -160,23 +145,15 @@ include::../../build/_output/docs-gen/stop_monitoring.adoc[tag=text]
 cohctl stop monitoring
 ----
 
-Output:
-[source,bash]
+Stopping does not require reading or validating the Grafana password.
+This ensures an exposed stack can still be stopped if the password file is missing or has incorrect permissions.
+cohctl prefers a parseable generated Compose file, then a parseable legacy file, and reports both paths when neither is usable.
+
+[source,text]
 ----
 Are you sure you want to stop monitoring? (y/n) y
-Issuing docker compose -f /Users/timbo/.cohctl/monitoring/docker-compose.yaml down
- Container monitoring-grafana-1  Stopping
- Container monitoring-prometheus-1  Stopping
- Container monitoring-prometheus-1  Stopped
- Container monitoring-prometheus-1  Removing
- Container monitoring-prometheus-1  Removed
- Container monitoring-grafana-1  Stopped
- Container monitoring-grafana-1  Removing
- Container monitoring-grafana-1  Removed
- Network monitoring_coherence  Removing
- Network monitoring_coherence  Removed
-Issuing docker ps
-CONTAINER ID   IMAGE     COMMAND   CREATED   STATUS    PORTS     NAMES
+Issuing docker compose --env-file /Users/timbo/.cohctl/monitoring/monitoring.env -f /Users/timbo/.cohctl/monitoring/docker-compose.cohctl.yaml down
+...
 ----
 
 [#get-monitoring]
@@ -189,29 +166,23 @@ include::../../build/_output/docs-gen/get_monitoring.adoc[tag=text]
 cohctl get monitoring
 ----
 
-Output:
-[source,bash]
+Example abbreviated output for the default loopback binding:
+
+[source,text]
 ----
 Monitoring status
-Grafana:    http://localhost:3000/d/coh-main/coherence-dashboard-main
+Grafana:    http://127.0.0.1:3000/d/coh-main/coherence-dashboard-main
   Image:    grafana/grafana:11.6.2
   Status:   ok, version=11.6.2
-Prometheus: http://localhost:9090/
+Prometheus: http://127.0.0.1:9090/
   Image:    prom/prometheus:v2.53.4
   Status:   Prometheus Server is Healthy.
-
-Compose:    /Users/timbo/.cohctl/monitoring/docker-compose.yaml
-Docker
-Issuing docker ps
-CONTAINER ID   IMAGE                     COMMAND                  CREATED              STATUS              PORTS                    NAMES
-ac74f5b13702   prom/prometheus:v2.53.4   "/bin/prometheus --c…"   About a minute ago   Up About a minute   0.0.0.0:9090->9090/tcp   monitoring-prometheus-1
-6c550a1f58d1   grafana/grafana:11.6.2    "/run.sh"                About a minute ago   Up About a minute   0.0.0.0:3000->3000/tcp   monitoring-grafana-1
+Compose:    /Users/timbo/.cohctl/monitoring/docker-compose.cohctl.yaml
 ----
+
+For an IPv6 binding, cohctl brackets the address when constructing URLs, for example `http://[::1]:3000/`.
 
 === See Also
 
 * {commercial-docs-base-url}/manage/using-coherence-metrics.html[Setting up Coherence Metrics]
 * xref:create_clusters.adoc[Creating Development Clusters]
-
-
-
