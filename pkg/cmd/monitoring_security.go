@@ -15,6 +15,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"sort"
 	"strconv"
@@ -34,7 +35,39 @@ const (
 	defaultMonitoringAddress   = "127.0.0.1"
 )
 
+// Read the credential once and check the read's exit status before exporting it.
+// Grafana's /run.sh uses an export assignment for __FILE, which can hide a failed
+// read and leave Grafana using its default password. Never delegate this read.
+const grafanaSecretReadScript = `fail() {
+  echo >&2 "cohctl: Grafana administrator secret is missing, unreadable or invalid; restore grafana-admin-password and reinitialize monitoring if necessary"
+  exit 1
+}
+secret="$GF_SECURITY_ADMIN_PASSWORD__FILE"
+[ -f "$secret" ] && [ ! -L "$secret" ] && [ -r "$secret" ] || fail
+password=$(/bin/cat "$secret") || fail
+[ "${#password}" -eq 43 ] || fail
+case "$password" in *[!A-Za-z0-9_-]*) fail ;; esac
+GF_SECURITY_ADMIN_PASSWORD="$password"
+export GF_SECURITY_ADMIN_PASSWORD
+unset password GF_SECURITY_ADMIN_PASSWORD__FILE
+`
+
+// Only this bootstrap runs as root. BusyBox su replaces PID 1, drops to the image's
+// grafana account and preserves the checked credential in the internal
+// environment. Check the identity before invoking any Grafana startup code.
+const grafanaSecretEntrypointScript = grafanaSecretReadScript + `exec /bin/busybox su -p -s /bin/sh -c '
+  [ "$(/bin/busybox id -u):$(/bin/busybox id -g)" = "472:0" ] || { echo >&2 "cohctl: unable to drop to Grafana UID 472 and GID 0"; exit 1; }
+  [ "${#GF_SECURITY_ADMIN_PASSWORD}" -eq 43 ] || exit 1
+  exec "$@"
+' grafana cohctl-grafana "$@"
+`
+
 var monitoringRandomReader = io.Reader(rand.Reader)
+
+func grafanaSecretEntrypoint() []any {
+	// Compose must pass shell dollar expressions through without interpolation.
+	return []any{"/bin/sh", "-ec", strings.ReplaceAll(grafanaSecretEntrypointScript, "$", "$$"), "cohctl-grafana", "/run.sh"}
+}
 
 type monitoringBundleMode int
 
@@ -341,6 +374,13 @@ func generateSecureCompose(contents []byte) ([]byte, error) {
 	}
 
 	grafana["environment"] = secureGrafanaEnvironment(grafana["environment"])
+	// A short root bootstrap can read native-Linux 0600 bind secrets and
+	// Desktop's root-owned mappings alike. The server always runs as 472:0.
+	grafana["user"] = "0:0"
+	grafana["cap_drop"] = []any{"ALL"}
+	grafana["cap_add"] = []any{"DAC_OVERRIDE", "SETUID", "SETGID"}
+	grafana["security_opt"] = []any{"no-new-privileges:true"}
+	grafana["entrypoint"] = grafanaSecretEntrypoint()
 	grafana["ports"] = secureServicePort(grafanaPort)
 	grafana["secrets"] = []any{map[string]any{"source": grafanaPasswordSecret, "target": grafanaPasswordSecret}}
 	grafana["volumes"] = removeSecretVolumeMounts(grafana["volumes"])
@@ -498,11 +538,27 @@ func validateSecureComposeDocument(document map[string]any) error {
 	if err := validateSecurePortList("Prometheus", prometheus["ports"], prometheusPort); err != nil {
 		return err
 	}
+	if grafana["user"] != "0:0" || !reflect.DeepEqual(grafana["cap_drop"], []any{"ALL"}) ||
+		!reflect.DeepEqual(grafana["cap_add"], []any{"DAC_OVERRIDE", "SETUID", "SETGID"}) ||
+		!reflect.DeepEqual(grafana["security_opt"], []any{"no-new-privileges:true"}) {
+		return errors.New("Grafana must use the restricted credential bootstrap; rerun 'cohctl init monitoring'")
+	}
+	if !reflect.DeepEqual(grafana["entrypoint"], grafanaSecretEntrypoint()) {
+		return errors.New("Grafana must use the fail-closed credential entrypoint; rerun 'cohctl init monitoring'")
+	}
+	if _, exists := grafana["command"]; exists {
+		return errors.New("Grafana must use the image's default command")
+	}
 	environment, ok := stringMap(grafana["environment"])
 	if !ok || environment["GF_SECURITY_ADMIN_USER"] != grafanaAdminUser || environment["GF_SECURITY_ADMIN_PASSWORD__FILE"] != grafanaAdminFileTarget {
 		return errors.New("Grafana administrator environment is not authoritative")
 	}
 	for key := range environment {
+		// The reader now starts as root. Do not let downloaded loader or
+		// shell hooks execute code before the static bootstrap drops identity.
+		if unsafeGrafanaBootstrapEnvironment(key) {
+			return fmt.Errorf("Grafana credential bootstrap does not permit environment setting %s", key)
+		}
 		if strings.HasPrefix(key, "GF_SECURITY_ADMIN_PASSWORD") && key != "GF_SECURITY_ADMIN_PASSWORD__FILE" {
 			return fmt.Errorf("Grafana contains competing administrator password setting %s", key)
 		}
@@ -527,6 +583,17 @@ func validateSecureComposeDocument(document map[string]any) error {
 		return errors.New("Grafana password secret source is invalid")
 	}
 	return nil
+}
+
+func unsafeGrafanaBootstrapEnvironment(key string) bool {
+	if strings.HasPrefix(key, "LD_") || strings.HasPrefix(key, "DYLD_") || strings.HasPrefix(key, "BASH_FUNC_") {
+		return true
+	}
+	switch key {
+	case "ENV", "BASH_ENV", "SHELLOPTS", "BASHOPTS", "GCONV_PATH", "LOCPATH", "MUSL_LOCPATH", "NLSPATH", "GLIBC_TUNABLES":
+		return true
+	}
+	return false
 }
 
 func validateSecurePortList(service string, value any, port int) error {
