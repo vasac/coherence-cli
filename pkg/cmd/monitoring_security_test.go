@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -564,5 +565,114 @@ func TestTrackedMonitoringTemplatesAreSafeByDefault(t *testing.T) {
 	}
 	if count := strings.Count(string(compose), "${COHCTL_MONITORING_BIND_ADDRESS:-127.0.0.1}"); count != 2 {
 		t.Fatalf("expected both tracked ports to default to loopback, got %d:\n%s", count, compose)
+	}
+}
+
+func TestGeneratedGrafanaRuntimeCannotBypassSecretDelivery(t *testing.T) {
+	for _, field := range []string{"user", "entrypoint", "command", "cap_add", "cap_drop", "security_opt"} {
+		t.Run(field, func(t *testing.T) {
+			generated, err := generateSecureCompose(trackedCompose(t))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var document map[string]any
+			if err = yaml.Unmarshal(generated, &document); err != nil {
+				t.Fatal(err)
+			}
+			if err = validateSecureComposeDocument(document); err != nil {
+				t.Fatal(err)
+			}
+			services, _ := stringMap(document["services"])
+			grafana, _ := stringMap(services["grafana"])
+			if field == "command" {
+				grafana[field] = []any{"--config=/tmp/alternate.ini"}
+			} else {
+				delete(grafana, field)
+			}
+			if err = validateSecureComposeDocument(document); err == nil {
+				t.Fatalf("accepted a generated model without authoritative %s", field)
+			}
+		})
+	}
+}
+
+func TestGrafanaCredentialEntrypoint(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Linux container shell is exercised by the Docker tests")
+	}
+	password := strings.Repeat("a", 43)
+	for _, test := range []struct {
+		name, contents              string
+		readFailure, missing, valid bool
+	}{
+		{name: "valid", contents: password, valid: true},
+		{name: "missing", missing: true},
+		{name: "empty"},
+		{name: "short", contents: "admin"},
+		{name: "invalid alphabet", contents: strings.Repeat("!", 43)},
+		{name: "failed read with partial output", contents: password, readFailure: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			directory := t.TempDir()
+			file := filepath.Join(directory, grafanaPasswordFile)
+			if !test.missing {
+				if err := os.WriteFile(file, []byte(test.contents), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			path := os.Getenv("PATH")
+			if test.readFailure {
+				// Simulate an I/O failure after cat has already emitted valid bytes.
+				if err := os.WriteFile(filepath.Join(directory, "cat"), []byte("#!/bin/sh\n/bin/cat \"$@\"\nexit 1\n"), 0700); err != nil {
+					t.Fatal(err)
+				}
+				path = directory + string(os.PathListSeparator) + path
+			}
+			script := grafanaSecretReadScript
+			if test.readFailure {
+				// Substitute only the executable for fault injection; production
+				// uses /bin/cat so a caller-controlled PATH cannot affect root.
+				script = strings.ReplaceAll(script, "/bin/cat ", "cat ")
+			}
+			command := exec.Command("/bin/sh", "-ec", script+`exec "$@"`, "cohctl-grafana", "/bin/sh", "-ec", `test "$GF_SECURITY_ADMIN_PASSWORD" = "$EXPECTED_PASSWORD"; test -z "${GF_SECURITY_ADMIN_PASSWORD__FILE+x}"; echo started`)
+			command.Env = append(os.Environ(), "PATH="+path, "GF_SECURITY_ADMIN_PASSWORD__FILE="+file, "EXPECTED_PASSWORD="+password)
+			output, err := command.CombinedOutput()
+			if test.valid {
+				if err != nil || string(output) != "started\n" {
+					t.Fatalf("credential handoff failed: %v, %s", err, output)
+				}
+			} else if err == nil || strings.Contains(string(output), "started") || !strings.Contains(string(output), "administrator secret") {
+				t.Fatalf("credential delivery did not fail closed: %v, %s", err, output)
+			}
+			if strings.Contains(string(output), password) {
+				t.Fatal("credential leaked to output")
+			}
+		})
+	}
+}
+
+func TestGrafanaBootstrapRejectsStartupEnvironmentHooks(t *testing.T) {
+	for _, key := range []string{"LD_PRELOAD", "LD_LIBRARY_PATH", "DYLD_INSERT_LIBRARIES", "BASH_FUNC_hook%%", "BASH_ENV", "ENV", "SHELLOPTS", "BASHOPTS", "GCONV_PATH", "LOCPATH", "MUSL_LOCPATH", "NLSPATH", "GLIBC_TUNABLES"} {
+		t.Run(key, func(t *testing.T) {
+			compose := bytes.Replace(trackedCompose(t), []byte("    image: grafana/grafana:"), []byte("    environment:\n      "+key+": /etc/grafana/grafana.ini\n    image: grafana/grafana:"), 1)
+			if _, err := generateSecureCompose(compose); err == nil || !strings.Contains(err.Error(), "does not permit environment") {
+				t.Fatalf("accepted downloaded startup hook %s: %v", key, err)
+			}
+			generated, err := generateSecureCompose(trackedCompose(t))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var document map[string]any
+			if err = yaml.Unmarshal(generated, &document); err != nil {
+				t.Fatal(err)
+			}
+			services, _ := stringMap(document["services"])
+			grafana, _ := stringMap(services["grafana"])
+			environment, _ := stringMap(grafana["environment"])
+			environment[key] = "/etc/grafana/grafana.ini"
+			if err = validateSecureComposeDocument(document); err == nil {
+				t.Fatalf("accepted generated startup hook %s", key)
+			}
+		})
 	}
 }

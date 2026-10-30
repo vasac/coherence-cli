@@ -58,6 +58,26 @@ The password is generated from 32 random bytes, displayed once after successful 
 On POSIX systems cohctl requires the file to be owned by the current user with no group or other access; on Windows it inherits the ACL of the user's cohctl configuration directory.
 Routine start and status output never displays the password.
 
+The generated Grafana container starts with a brief root bootstrap so it can read both native Linux owner-only files and Docker Desktop's mapped files.
+All capabilities are dropped except `DAC_OVERRIDE`, `SETUID`, and `SETGID`, and `no-new-privileges` prevents later elevation.
+After checking the secret, the entrypoint uses the image's `/bin/busybox su` to become the `grafana` account and uses `/bin/busybox id` to verify UID `472` and group `0` before invoking `/run.sh`.
+Grafana's startup, plugins, and server run under that normal image identity, with no effective capabilities.
+This also applies when cohctl itself is invoked as root.
+Downloaded loader and shell startup environment hooks are rejected because they could execute before the identity drop.
+Docker records the bootstrap user as root; use `docker compose exec --user 472:0 grafana ...` when troubleshooting under the server's identity.
+The image must provide the BusyBox `su` applet, the `grafana` account with that identity, and writable data/plugin directories; the tracked image does so.
+cohctl never changes the host secret's owner or broadens its permissions, and does not create another password file in the container.
+If a remapped or remote daemon cannot read the mapped secret even during bootstrap, startup fails.
+Native Windows ACL mapping, complete generated-stack startup through Desktop host-file sharing, and custom plugin installation still require runtime qualification.
+
+The generated entrypoint reads the secret once, checks the read result and password format, then invokes Grafana's `/run.sh` with `exec`.
+A missing, unreadable, empty, or invalid secret stops the container before Grafana starts.
+The password is absent from Compose values, Docker-configured environment values, and process arguments.
+It is exported inside the container as `GF_SECURITY_ADMIN_PASSWORD` for Grafana itself; Grafana's standard `__FILE` wrapper also exports secrets internally.
+
+Generated bundles created before this bootstrap and entrypoint fix must be regenerated: save customizations, run `cohctl stop monitoring` to remove the old containers, then initialize again.
+The new CLI rejects their older generated model for start and status; stop remains available.
+
 Example abbreviated output:
 
 [source,text]
