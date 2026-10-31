@@ -8,6 +8,7 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -276,7 +277,10 @@ func TestMonitoringCheckoutStack(t *testing.T) {
 	f.dashboards = GetURLContents
 	docker := func(args ...string) []byte {
 		t.Helper()
-		command := exec.Command("docker", args...)
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		command := exec.CommandContext(ctx, "docker", args...)
+		command.WaitDelay = 2 * time.Second
 		output, err := command.CombinedOutput()
 		if err != nil {
 			t.Fatalf("Docker %s failed: %v (output withheld to protect credentials)", args[0], err)
@@ -337,6 +341,9 @@ func TestMonitoringCheckoutStack(t *testing.T) {
 		if bytes.Contains(config, []byte(password)) {
 			t.Fatal("secret leaked into Docker-configured arguments/environment")
 		}
+		if service == checkoutGrafanaService && bytes.Contains(config, []byte("GF_PLUGINS_PREINSTALL_DISABLED=")) {
+			t.Fatal("full-stack fixture must retain production plugin defaults")
+		}
 		if service == checkoutGrafanaService && !bytes.Contains(config, []byte("GF_SERVER_DOMAIN="+checkoutMonitoringMarker)) {
 			t.Fatal("running Grafana did not consume checkout Compose input")
 		}
@@ -386,10 +393,12 @@ func TestMonitoringCheckoutStack(t *testing.T) {
 		}
 	}
 	if err := stopMonitoringCmd.RunE(f.command, nil); err != nil {
-		t.Fatal(err)
+		t.Errorf("stop monitoring failed (output withheld to protect credentials)")
 	}
 	if len(bytes.TrimSpace(compose("ps", "--all", "-q"))) != 0 {
 		t.Fatal("stop monitoring left containers")
 	}
-	t.Log("full checkout init/start/get/stop passed; generated-password HTTP 200, admin/admin HTTP 401; two loopback listeners, protected host secret and Prometheus isolation verified")
+	if !t.Failed() {
+		t.Log("full checkout init/start/get/stop passed; generated-password HTTP 200, admin/admin HTTP 401; two loopback listeners, protected host secret and Prometheus isolation verified; stop handler removed all fixture containers")
+	}
 }
