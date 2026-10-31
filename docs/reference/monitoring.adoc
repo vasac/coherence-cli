@@ -118,10 +118,12 @@ Explicit wildcard values `0.0.0.0` and `::` are supported but produce a stronger
 
 ===== Existing legacy installations
 
-An installation with `docker-compose.yaml` but none of the three generated-bundle files remains in legacy mode.
+An installation with a usable `docker-compose.yaml` remains in legacy mode only when all three generated-bundle paths are absent.
 cohctl inspects it, warns about known or missing Grafana credentials and exposed ports, and does not rewrite it implicitly.
 Re-run `cohctl init monitoring` to rotate to a generated password and loopback binding.
 A partial or corrupt generated bundle is treated as an error by `start` and `get`; cohctl never silently falls back to a legacy credential in that state.
+An existing directory, special file, or valid or dangling symlink at any generated-bundle path is also invalid, even when the other two paths are absent.
+The error identifies the offending path and directs you to reinitialize; `cohctl stop monitoring` retains the recovery rules described below.
 
 [#start-monitoring]
 ==== Start Monitoring Stack

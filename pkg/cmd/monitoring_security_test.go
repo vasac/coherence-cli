@@ -15,6 +15,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -395,30 +396,177 @@ func assertOneSecurePort(t *testing.T, service map[string]any, port int) {
 	}
 }
 
-func TestClassifyMonitoringBundle(t *testing.T) {
+// Both start and get call validateEnvironment before Docker or HTTP operations.
+func TestMonitoringBundleRejectsNonRegularArtifacts(t *testing.T) {
+	generatedFiles := []string{generatedDockerComposeYAML, monitoringEnvFile, grafanaPasswordFile}
+	artifactTypes := []struct {
+		name   string
+		create func(*testing.T, string)
+	}{
+		{"directory", func(t *testing.T, path string) {
+			if err := os.Mkdir(path, 0700); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{"valid symlink", func(t *testing.T, path string) {
+			target := filepath.Join(t.TempDir(), "target")
+			if err := os.WriteFile(target, minimalLegacyCompose(), 0600); err != nil {
+				t.Fatal(err)
+			}
+			monitoringTestSymlink(t, target, path)
+		}},
+		{"dangling symlink", func(t *testing.T, path string) {
+			monitoringTestSymlink(t, path+"-absent", path)
+		}},
+	}
+	for _, artifact := range artifactTypes {
+		t.Run(artifact.name, func(t *testing.T) {
+			check := func(t *testing.T, invalid []string, regularOthers bool) {
+				directory := monitoringValidationFixture(t)
+				for _, name := range generatedFiles {
+					isInvalid := false
+					for _, invalidName := range invalid {
+						isInvalid = isInvalid || name == invalidName
+					}
+					if isInvalid {
+						artifact.create(t, filepath.Join(directory, name))
+					} else if regularOthers {
+						writeMonitoringTestArtifact(t, directory, name)
+					}
+				}
+				mode, err := classifyMonitoringBundle(directory)
+				if mode != monitoringBundleInvalid {
+					t.Errorf("expected invalid mode, got %v", mode)
+				}
+				assertInvalidMonitoringArtifact(t, err, invalid[0])
+				mon := newMonitoringAt(&cobra.Command{}, directory)
+				assertInvalidMonitoringArtifact(t, mon.validateEnvironment(), invalid[0])
+
+				// Stop retains its separate parseable-model rules, including
+				// following a valid Compose symlink for recovery.
+				wantGenerated := regularOthers && invalid[0] != generatedDockerComposeYAML ||
+					artifact.name == "valid symlink" && (invalid[0] == generatedDockerComposeYAML || len(invalid) == len(generatedFiles))
+				wantBase := dockerComposeYAML
+				if wantGenerated {
+					wantBase = generatedDockerComposeYAML
+				}
+				file, address, generated, err := mon.composeForStop()
+				if err != nil || filepath.Base(file) != wantBase || generated != wantGenerated || address != defaultMonitoringAddress {
+					t.Fatalf("unexpected stop selection file=%s generated=%v address=%s error=%v", file, generated, address, err)
+				}
+			}
+			for _, name := range generatedFiles {
+				t.Run(name+"/alone", func(t *testing.T) { check(t, []string{name}, false) })
+				t.Run(name+"/mixed", func(t *testing.T) { check(t, []string{name}, true) })
+			}
+			t.Run("all", func(t *testing.T) { check(t, generatedFiles, false) })
+		})
+	}
+}
+
+func monitoringTestSymlink(t *testing.T, target, path string) {
+	t.Helper()
+	if err := os.Symlink(target, path); err != nil {
+		if errors.Is(err, os.ErrPermission) || errors.Is(err, syscall.ENOTSUP) || errors.Is(err, syscall.ENOSYS) {
+			t.Skipf("symlink creation unavailable: %v", err)
+		}
+		t.Fatal(err)
+	}
+}
+
+func assertInvalidMonitoringArtifact(t *testing.T, err error, name string) {
+	t.Helper()
+	if err == nil || !strings.Contains(err.Error(), name) ||
+		!strings.Contains(err.Error(), "regular non-symbolic-link file") || !strings.Contains(err.Error(), "cohctl init monitoring") {
+		t.Fatalf("expected actionable non-regular bundle error naming %s, got %v", name, err)
+	}
+}
+
+func monitoringValidationFixture(t *testing.T) string {
+	t.Helper()
 	directory := t.TempDir()
-	if err := os.WriteFile(filepath.Join(directory, dockerComposeYAML), []byte("services: {}"), 0600); err != nil {
+	mon := newMonitoringAt(&cobra.Command{}, directory)
+	if err := mon.ensureDirectories(); err != nil {
 		t.Fatal(err)
 	}
-	mode, err := classifyMonitoringBundle(directory)
-	if err != nil || mode != monitoringBundleLegacy {
-		t.Fatalf("expected legacy mode, got %v, %v", mode, err)
+	for _, name := range dashboardFiles {
+		if err := os.WriteFile(filepath.Join(mon.dashboardsDir, name), []byte("{}"), 0600); err != nil {
+			t.Fatal(err)
+		}
 	}
-	if err = os.WriteFile(filepath.Join(directory, generatedDockerComposeYAML), []byte("services: {}"), 0600); err != nil {
+	for _, name := range dockerComposeFiles {
+		if err := os.WriteFile(filepath.Join(directory, name), minimalLegacyCompose(), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return directory
+}
+
+func writeMonitoringTestArtifact(t *testing.T, directory, name string) {
+	t.Helper()
+	var contents []byte
+	switch name {
+	case generatedDockerComposeYAML:
+		contents = secureCompose(t)
+	case monitoringEnvFile:
+		contents = []byte(monitoringBindAddressEnv + "=" + defaultMonitoringAddress + "\n")
+	case grafanaPasswordFile:
+		contents = bytes.Repeat([]byte("a"), 43)
+	default:
+		t.Fatalf("unexpected generated artifact: %s", name)
+	}
+	if err := os.WriteFile(filepath.Join(directory, name), contents, 0600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = classifyMonitoringBundle(directory); err == nil || !strings.Contains(err.Error(), "incomplete") {
-		t.Fatalf("expected incomplete bundle error, got %v", err)
-	}
-	if err = os.WriteFile(filepath.Join(directory, monitoringEnvFile), []byte("COHCTL_MONITORING_BIND_ADDRESS=127.0.0.1\n"), 0600); err != nil {
-		t.Fatal(err)
-	}
-	if err = os.WriteFile(filepath.Join(directory, grafanaPasswordFile), []byte("secret"), 0600); err != nil {
-		t.Fatal(err)
-	}
-	mode, err = classifyMonitoringBundle(directory)
-	if err != nil || mode != monitoringBundleGenerated {
-		t.Fatalf("expected generated mode, got %v, %v", mode, err)
+}
+
+func TestClassifyMonitoringBundle(t *testing.T) {
+	generatedFiles := []string{generatedDockerComposeYAML, monitoringEnvFile, grafanaPasswordFile}
+	for present := 0; present < 8; present++ {
+		t.Run(strconv.Itoa(present), func(t *testing.T) {
+			directory := monitoringValidationFixture(t)
+			for index, name := range generatedFiles {
+				if present&(1<<index) != 0 {
+					writeMonitoringTestArtifact(t, directory, name)
+				}
+			}
+			mode, err := classifyMonitoringBundle(directory)
+			mon := newMonitoringAt(&cobra.Command{}, directory)
+			if present != 0 && present != 7 {
+				if mode != monitoringBundleInvalid || err == nil || !strings.Contains(err.Error(), "incomplete") {
+					t.Fatalf("expected partial regular bundle rejection, got mode=%v error=%v", mode, err)
+				}
+				if err := mon.validateEnvironment(); err == nil || !strings.Contains(err.Error(), "incomplete") {
+					t.Fatalf("expected start/get rejection, got %v", err)
+				}
+				return
+			}
+			wantMode, wantBase := monitoringBundleLegacy, dockerComposeYAML
+			if present == 7 {
+				wantMode, wantBase = monitoringBundleGenerated, generatedDockerComposeYAML
+			}
+			if err != nil || mode != wantMode {
+				t.Fatalf("expected mode=%v, got mode=%v error=%v", wantMode, mode, err)
+			}
+			if err := mon.validateEnvironment(); err != nil {
+				t.Fatal(err)
+			}
+			if mon.bundleMode != wantMode || filepath.Base(mon.composeFile) != wantBase || mon.bindAddress != defaultMonitoringAddress {
+				t.Fatalf("unexpected start/get selection: %+v", mon)
+			}
+			// A complete generated bundle does not depend on retained legacy Compose.
+			if err := os.Remove(filepath.Join(directory, dockerComposeYAML)); err != nil {
+				t.Fatal(err)
+			}
+			mode, err = classifyMonitoringBundle(directory)
+			if present == 0 {
+				if mode != monitoringBundleInvalid || err == nil {
+					t.Fatalf("expected absent installation rejection, got mode=%v error=%v", mode, err)
+				}
+			} else if err != nil || mode != monitoringBundleGenerated {
+				t.Fatalf("expected generated mode without legacy, got mode=%v error=%v", mode, err)
+			}
+		})
 	}
 }
 
