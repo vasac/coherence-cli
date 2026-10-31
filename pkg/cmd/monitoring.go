@@ -443,6 +443,8 @@ func (m *monitoring) installStagedDirectory(stagedDirectory string) error {
 	return nil
 }
 
+// Grafana applies its initial administrator password only to a fresh database.
+// Even a stopped container can reuse the old database after secret replacement.
 func (m *monitoring) ensureMonitoringIsStopped() error {
 	generated := filepath.Join(m.monitoringDir, generatedDockerComposeYAML)
 	legacy := filepath.Join(m.monitoringDir, dockerComposeYAML)
@@ -462,24 +464,27 @@ func (m *monitoring) ensureMonitoringIsStopped() error {
 		}
 	}
 	if composeFile == "" {
-		if !utils.DirectoryExists(m.monitoringDir) {
-			return nil
+		// Containers can outlive a missing or unusable configuration directory.
+		// Match Compose's project override, otherwise the monitoring directory name.
+		project := os.Getenv("COMPOSE_PROJECT_NAME")
+		if project == "" {
+			project = monitoringDirectory
 		}
-		output, err := executeHostCommandOutput(nil, "docker", "ps", "-q", "--filter", "label=com.docker.compose.project="+monitoringDirectory)
+		output, err := executeHostCommandOutput(nil, "docker", "ps", "--all", "-q", "--filter", "label=com.docker.compose.project="+project)
 		if err != nil {
-			return fmt.Errorf("unable to determine whether the existing monitoring stack is running; stop it before reinitializing: %w", err)
+			return fmt.Errorf("unable to determine whether monitoring containers remain; remove them with 'cohctl stop monitoring' before reinitializing: %w", err)
 		}
 		if strings.TrimSpace(output) != "" {
-			return errors.New("monitoring containers are running; run 'cohctl stop monitoring' before reinitializing")
+			return errors.New("monitoring containers still exist (including stopped containers); run 'cohctl stop monitoring' to remove them before reinitializing")
 		}
 		return nil
 	}
-	output, err := m.composeOutput(composeFile, bindAddress, []string{"ps", "-q"})
+	output, err := m.composeOutput(composeFile, bindAddress, []string{"ps", "--all", "-q"})
 	if err != nil {
-		return fmt.Errorf("unable to determine whether the existing monitoring stack is running; stop it with 'cohctl stop monitoring' before reinitializing: %w", err)
+		return fmt.Errorf("unable to determine whether monitoring containers remain; remove them with 'cohctl stop monitoring' before reinitializing: %w", err)
 	}
 	if strings.TrimSpace(output) != "" {
-		return errors.New("monitoring containers are running; run 'cohctl stop monitoring' before reinitializing")
+		return errors.New("monitoring containers still exist (including stopped containers); run 'cohctl stop monitoring' to remove them before reinitializing")
 	}
 	return nil
 }
