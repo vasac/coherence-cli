@@ -47,13 +47,13 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
-      - name: Validate Grafana credential delivery on Linux
+      - name: Validate Grafana credentials and stopped-container password rotation on Linux
         shell: bash
         run: |
           set -euo pipefail
           docker pull busybox:1.37.0
           docker compose -f monitoring/docker-compose.yaml pull grafana
-          COHCTL_TEST_MONITORING_DOCKER=1 go test -count=1 ./pkg/cmd -run '^TestGrafana(SecretDeliveryLinux|GeneratedPasswordAuthentication)$'
+          COHCTL_TEST_MONITORING_DOCKER=1 go test -count=1 ./pkg/cmd -run '^TestGrafana(SecretDeliveryLinux|GeneratedPasswordAuthentication|StoppedContainerPasswordRotation)$'
 
       - name: Build and Test Monitoring
         shell: bash
