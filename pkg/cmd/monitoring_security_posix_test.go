@@ -165,15 +165,15 @@ func assertMonitoringRecoveryStopped(t *testing.T, mon *monitoring, wantBase str
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantArgs := []string{"ps", "-q", "--filter", "label=com.docker.compose.project=" + monitoringDirectory}
+	wantArgs := []string{"ps", "--all", "-q", "--filter", "label=com.docker.compose.project=" + monitoringDirectory}
 	if wantBase != "" {
-		wantArgs = []string{"compose", "-f", filepath.Join(mon.monitoringDir, wantBase), "ps", "-q"}
+		wantArgs = []string{"compose", "-f", filepath.Join(mon.monitoringDir, wantBase), "ps", "--all", "-q"}
 	}
 	if string(args) != strings.Join(wantArgs, "\n")+"\n" {
 		t.Fatalf("unexpected stopped-check command: %q, want %q", args, wantArgs)
 	}
 	t.Setenv("COHCTL_TEST_DOCKER_RUNNING", "1")
-	if err := mon.ensureMonitoringIsStopped(); err == nil || !strings.Contains(err.Error(), "monitoring containers are running") {
+	if err := mon.ensureMonitoringIsStopped(); err == nil || !strings.Contains(err.Error(), "monitoring containers still exist") {
 		t.Fatalf("expected running monitoring containers to prevent reinitialization, got %v", err)
 	}
 }

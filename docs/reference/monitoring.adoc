@@ -99,7 +99,21 @@ Generated compose configuration: /Users/timbo/.cohctl/monitoring/docker-compose.
 ----
 
 Re-running initialization generates a new password and replaces the complete monitoring directory only after all staging and image-pull work succeeds.
-Initialization refuses to replace the directory while its monitoring containers are running; stop them first.
+Initialization refuses to replace the directory while any monitoring-project containers remain, including stopped, exited or created containers.
+Run `cohctl stop monitoring` to remove them with Compose `down` before retrying.
+`docker compose stop`, stopping a container in Docker's UI, or a container exit is insufficient: a reused Grafana database retains its old administrator password even if the initial-password file changes.
+If Docker container discovery fails, initialization leaves the existing directory and password untouched.
+
+To rotate the generated password:
+
+[source,bash]
+----
+cohctl stop monitoring
+cohctl init monitoring
+cohctl start monitoring
+----
+
+Ordinary starts reuse the existing password; they do not rotate it.
 
 ===== Select a bind address
 
@@ -120,7 +134,7 @@ Explicit wildcard values `0.0.0.0` and `::` are supported but produce a stronger
 
 An installation with a usable `docker-compose.yaml` remains in legacy mode only when all three generated-bundle paths are absent.
 cohctl inspects it, warns about known or missing Grafana credentials and exposed ports, and does not rewrite it implicitly.
-Re-run `cohctl init monitoring` to rotate to a generated password and loopback binding.
+Run `cohctl stop monitoring` to remove existing containers, then `cohctl init monitoring` to rotate to a generated password and loopback binding.
 A partial or corrupt generated bundle is treated as an error by `start` and `get`; cohctl never silently falls back to a legacy credential in that state.
 An existing directory, special file, or valid or dangling symlink at any generated-bundle path is also invalid, even when the other two paths are absent.
 The error identifies the offending path and directs you to reinitialize; `cohctl stop monitoring` retains the recovery rules described below.
@@ -167,13 +181,19 @@ include::../../build/_output/docs-gen/stop_monitoring.adoc[tag=text]
 cohctl stop monitoring
 ----
 
+`cohctl stop monitoring` runs Compose `down`, removing the project containers rather than leaving stopped containers behind.
+The configuration and password file remain available for the next start.
+The generated model does not persist Grafana's database outside its container, so Grafana UI changes can be lost after removal.
 Stopping does not require reading or validating the Grafana password.
 This ensures an exposed stack can still be stopped if the password file is missing or has incorrect permissions.
 cohctl prefers a parseable generated Compose file, then a parseable legacy file, and reports both paths when neither is usable.
 Recovery Compose files must resolve to regular files; symlinks to regular files are accepted, while directories, FIFOs and other special files are skipped before reading.
 For generated recovery, an absent, invalid or non-regular `monitoring.env` uses the safe `127.0.0.1` default and is omitted from the Compose arguments.
 A valid persisted address is still used, and an inherited bind-address override cannot replace the selected recovery address.
-These recovery rules also apply when checking whether monitoring is stopped before reinitialization; `start` and `get` retain strict bundle validation.
+These recovery file rules also apply to the pre-initialization container check; `start` and `get` retain strict bundle validation.
+When neither Compose model is usable, initialization queries all containers with the exact monitoring-project label, even when the directory is missing.
+The fallback uses `COMPOSE_PROJECT_NAME` when set, otherwise `monitoring`; retain the same project selection when removing and reinitializing a stack.
+If both models are damaged, restore one so `cohctl stop monitoring` can remove the containers, or use Docker Compose directly for that exact project.
 
 [source,text]
 ----
