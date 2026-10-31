@@ -272,14 +272,17 @@ func classifyMonitoringBundle(directory string) (monitoringBundleMode, error) {
 	missing := make([]string, 0, len(generatedFiles))
 	for _, name := range generatedFiles {
 		info, err := os.Lstat(filepath.Join(directory, name))
-		if err == nil && info.Mode().IsRegular() {
-			found = append(found, name)
+		if errors.Is(err, os.ErrNotExist) {
+			missing = append(missing, name)
 			continue
 		}
-		if err != nil && !errors.Is(err, os.ErrNotExist) {
+		if err != nil {
 			return monitoringBundleInvalid, fmt.Errorf("unable to inspect monitoring bundle file %s: %w", name, err)
 		}
-		missing = append(missing, name)
+		if !info.Mode().IsRegular() {
+			return monitoringBundleInvalid, monitoringNotValid(fmt.Sprintf("generated monitoring bundle file %s must be a regular non-symbolic-link file", filepath.Join(directory, name)))
+		}
+		found = append(found, name)
 	}
 	if len(found) == len(generatedFiles) {
 		return monitoringBundleGenerated, nil
