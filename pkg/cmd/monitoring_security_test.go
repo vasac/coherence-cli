@@ -867,6 +867,7 @@ func TestGrafanaCredentialEntrypoint(t *testing.T) {
 			path := os.Getenv("PATH")
 			if test.readFailure {
 				// Simulate an I/O failure after cat has already emitted valid bytes.
+				// #nosec G306 -- owner-only executable read-failure stub in t.TempDir.
 				if err := os.WriteFile(filepath.Join(directory, "cat"), []byte("#!/bin/sh\n/bin/cat \"$@\"\nexit 1\n"), 0700); err != nil {
 					t.Fatal(err)
 				}

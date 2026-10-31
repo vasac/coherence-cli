@@ -198,7 +198,7 @@ func (f *grafanaDockerFixture) checkComposeEntrypoint() {
 		if err != nil {
 			f.t.Fatal(err)
 		}
-		// #nosec G306 -- non-secret fixture configuration is readable by Grafana.
+		// #nosec G306 G703 -- fixed fixture names in a private test directory; non-secret configuration is readable by Grafana.
 		if err = os.WriteFile(filepath.Join(directory, name), contents, 0644); err != nil {
 			f.t.Fatal(err)
 		}

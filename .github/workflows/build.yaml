@@ -58,7 +58,7 @@ jobs:
       with:
         go-version-file: 'go.mod'
 
-    - name: Code Review
+    - name: Lint
       shell: bash
       run: |
         make golangci

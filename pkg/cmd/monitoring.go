@@ -690,7 +690,7 @@ func monitoringNotValid(message string) error {
 
 func writeFileContents(base, file string, content []byte) error {
 	destination := filepath.Join(base, file)
-	// #nosec G306 -- non-secret monitoring configuration must be readable by Docker on Linux.
+	// #nosec G306 G703 -- caller-selected local staging directory and fixed asset names; non-secret Docker configuration must be readable on Linux.
 	if err := os.WriteFile(destination, content, 0644); err != nil {
 		return fmt.Errorf("error writing file %s: %w", destination, err)
 	}
@@ -727,6 +727,7 @@ func executeHostCommand(cmd *cobra.Command, environment []string, name string, a
 }
 
 func executeHostCommandOutput(environment []string, name string, args ...string) (string, error) {
+	// #nosec G702 -- callers select docker/docker-compose; arguments are separate argv entries, with no shell evaluation.
 	command := exec.Command(name, args...)
 	command.Env = withEnvironment(environment)
 	contents, err := command.CombinedOutput()
