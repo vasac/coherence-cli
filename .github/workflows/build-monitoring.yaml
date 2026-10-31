@@ -60,8 +60,6 @@ jobs:
         run: |
           set -euo pipefail
           make cohctl
-          PATH="$(pwd)/bin:${PATH}"
-          export PATH
 
           # Validate the templates from this checkout rather than GitHub main.
           if grep -Eq '^[[:space:]]*admin_password[[:space:]]*=' monitoring/grafana.ini; then
@@ -73,47 +71,11 @@ jobs:
           test "$(grep -c 'host_ip: 127.0.0.1' "${tracked_config}")" -eq 2
           rm -f "${tracked_config}"
 
-          init_output="$(mktemp)"
-          cohctl init monitoring -y > "${init_output}"
-          sed -E 's/^(Grafana administrator password: ).*/\1<redacted>/' "${init_output}"
-          rm -f "${init_output}"
-
-          monitoring_dir="${HOME}/.cohctl/monitoring"
-          generated_compose="${monitoring_dir}/docker-compose.cohctl.yaml"
-          monitoring_env="${monitoring_dir}/monitoring.env"
-          password_file="${monitoring_dir}/grafana-admin-password"
-          test "$(stat -c '%a' "${password_file}")" = "600"
-
-          generated_config="$(mktemp)"
-          docker compose --env-file "${monitoring_env}" -f "${generated_compose}" config > "${generated_config}"
-          test "$(grep -c 'host_ip: 127.0.0.1' "${generated_config}")" -eq 2
-          rm -f "${generated_config}"
-
-          trap 'cohctl stop monitoring -y || true' EXIT
-          cohctl start monitoring
-          grafana_ready=false
-          for _ in {1..30}; do
-            if curl -fsS http://127.0.0.1:3000/api/health >/dev/null; then
-              grafana_ready=true
-              break
-            fi
-            sleep 2
-          done
-          test "${grafana_ready}" = "true"
-          test "$(docker compose --env-file "${monitoring_env}" -f "${generated_compose}" port grafana 3000)" = "127.0.0.1:3000"
-          test "$(docker compose --env-file "${monitoring_env}" -f "${generated_compose}" port prometheus 9090)" = "127.0.0.1:9090"
-          docker compose --env-file "${monitoring_env}" -f "${generated_compose}" exec -T prometheus sh -c 'test ! -e /run/secrets/grafana_admin_password'
-
-          grafana_password="$(< "${password_file}")"
-          printf 'user = "admin:%s"\n' "${grafana_password}" | curl --config - -fsS http://127.0.0.1:3000/api/org >/dev/null
-          if curl -fsS -u admin:admin http://127.0.0.1:3000/api/org >/dev/null; then
-            echo "Grafana unexpectedly accepted admin/admin" >&2
-            exit 1
-          fi
-          cohctl get monitoring
-          curl -fsS http://127.0.0.1:9090/-/healthy
-          cohctl stop monitoring -y
-          trap - EXIT
+          # The shared initializer reads checkout support templates, including
+          # controlled markers/unsafe credential inputs, before staging and
+          # sanitization. Operator dashboards still use their separate main URL.
+          # No coherence-cli release tag needs to exist for this test.
+          COHCTL_TEST_MONITORING_DOCKER=1 go test -count=1 -v ./pkg/cmd -run '^TestMonitoringCheckoutStack$'
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: failure()

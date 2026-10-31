@@ -87,88 +87,95 @@ It downloads the Grafana dashboards and monitoring configuration, creates a
 	generated secure compose bundle, and pulls the Grafana and Prometheus images.`,
 	Args: cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		if _, err := monitoringConfigBaseURL(Version); err != nil {
-			return err
-		}
-		bindAddress, err := monitoringBindAddressFromEnvironment()
-		if err != nil {
-			return err
-		}
-		cmd.Println("This command will:")
-		cmd.Printf("1. Create or replace %s\n", filepath.Join(cfgDirectory, monitoringDirectory))
-		cmd.Println("2. Download Grafana dashboards and monitoring configuration")
-		cmd.Println("3. Generate a protected Grafana administrator password")
-		cmd.Println("4. Pull Grafana and Prometheus images")
-		cmd.Println()
-		if !confirmOperation(cmd, "Are you sure you want to initialize monitoring? (y/n) ") {
-			return nil
-		}
-
-		mon := newMonitoring(cmd)
-		if err = mon.requireComposeV2(); err != nil {
-			return err
-		}
-		if err = mon.ensureMonitoringIsStopped(); err != nil {
-			return err
-		}
-		if err = ensureDirectory(cfgDirectory); err != nil {
-			return err
-		}
-		stagedDirectory, err := os.MkdirTemp(cfgDirectory, ".monitoring-staging-")
-		if err != nil {
-			return fmt.Errorf("unable to create monitoring staging directory: %w", err)
-		}
-		installed := false
-		defer func() {
-			if !installed {
-				_ = os.RemoveAll(stagedDirectory)
-			}
-		}()
-		staged := newMonitoringAt(cmd, stagedDirectory)
-
-		cmd.Println("Staging Grafana dashboards...")
-		if err = staged.ensureDirectories(); err != nil {
-			return err
-		}
-		if err = staged.downloadDashboards(); err != nil {
-			return err
-		}
-		cmd.Println("Staging monitoring configuration...")
-		if err = staged.downloadDockerComposeFiles(); err != nil {
-			return err
-		}
-		password, err := staged.createGeneratedBundle(bindAddress)
-		if err != nil {
-			return err
-		}
-		staged.composeFile = filepath.Join(staged.monitoringDir, generatedDockerComposeYAML)
-		if err = staged.discoverImages(); err != nil {
-			return err
-		}
-
-		cmd.Println("Pulling docker images...")
-		if err = staged.dockerCommand([]string{"pull", staged.prometheusImage}); err != nil {
-			return err
-		}
-		if err = staged.dockerCommand([]string{"pull", staged.grafanaImage}); err != nil {
-			return err
-		}
-		if err = mon.installStagedDirectory(stagedDirectory); err != nil {
-			return err
-		}
-		installed = true
-
-		cmd.Println(OperationCompleted)
-		if warning := monitoringExposureWarning(bindAddress); warning != "" {
-			cmd.Println(warning)
-		}
-		cmd.Println()
-		cmd.Println("Grafana administrator user: admin")
-		cmd.Printf("Grafana administrator password: %s\n", password)
-		cmd.Printf("The password is stored in %s and will not be displayed again.\n", filepath.Join(mon.monitoringDir, grafanaPasswordFile))
-		cmd.Printf("Generated compose configuration: %s\n", filepath.Join(mon.monitoringDir, generatedDockerComposeYAML))
-		return nil
+		return initializeMonitoring(cmd, GetURLContents)
 	},
+}
+
+// initializeMonitoring shares the complete initialization path with the checkout
+// integration harness. Production always supplies GetURLContents; the reader is
+// an explicit dependency, never a CLI/environment source override.
+func initializeMonitoring(cmd *cobra.Command, readURL func(string) ([]byte, error)) error {
+	if _, err := monitoringConfigBaseURL(Version); err != nil {
+		return err
+	}
+	bindAddress, err := monitoringBindAddressFromEnvironment()
+	if err != nil {
+		return err
+	}
+	cmd.Println("This command will:")
+	cmd.Printf("1. Create or replace %s\n", filepath.Join(cfgDirectory, monitoringDirectory))
+	cmd.Println("2. Download Grafana dashboards and monitoring configuration")
+	cmd.Println("3. Generate a protected Grafana administrator password")
+	cmd.Println("4. Pull Grafana and Prometheus images")
+	cmd.Println()
+	if !confirmOperation(cmd, "Are you sure you want to initialize monitoring? (y/n) ") {
+		return nil
+	}
+
+	mon := newMonitoring(cmd)
+	if err = mon.requireComposeV2(); err != nil {
+		return err
+	}
+	if err = mon.ensureMonitoringIsStopped(); err != nil {
+		return err
+	}
+	if err = ensureDirectory(cfgDirectory); err != nil {
+		return err
+	}
+	stagedDirectory, err := os.MkdirTemp(cfgDirectory, ".monitoring-staging-")
+	if err != nil {
+		return fmt.Errorf("unable to create monitoring staging directory: %w", err)
+	}
+	installed := false
+	defer func() {
+		if !installed {
+			_ = os.RemoveAll(stagedDirectory)
+		}
+	}()
+	staged := newMonitoringAt(cmd, stagedDirectory)
+
+	cmd.Println("Staging Grafana dashboards...")
+	if err = staged.ensureDirectories(); err != nil {
+		return err
+	}
+	if err = staged.downloadDashboards(readURL); err != nil {
+		return err
+	}
+	cmd.Println("Staging monitoring configuration...")
+	if err = staged.downloadDockerComposeFiles(readURL); err != nil {
+		return err
+	}
+	password, err := staged.createGeneratedBundle(bindAddress)
+	if err != nil {
+		return err
+	}
+	staged.composeFile = filepath.Join(staged.monitoringDir, generatedDockerComposeYAML)
+	if err = staged.discoverImages(); err != nil {
+		return err
+	}
+
+	cmd.Println("Pulling docker images...")
+	if err = staged.dockerCommand([]string{"pull", staged.prometheusImage}); err != nil {
+		return err
+	}
+	if err = staged.dockerCommand([]string{"pull", staged.grafanaImage}); err != nil {
+		return err
+	}
+	if err = mon.installStagedDirectory(stagedDirectory); err != nil {
+		return err
+	}
+	installed = true
+
+	cmd.Println(OperationCompleted)
+	if warning := monitoringExposureWarning(bindAddress); warning != "" {
+		cmd.Println(warning)
+	}
+	cmd.Println()
+	cmd.Println("Grafana administrator user: admin")
+	cmd.Printf("Grafana administrator password: %s\n", password)
+	cmd.Printf("The password is stored in %s and will not be displayed again.\n", filepath.Join(mon.monitoringDir, grafanaPasswordFile))
+	cmd.Printf("Generated compose configuration: %s\n", filepath.Join(mon.monitoringDir, generatedDockerComposeYAML))
+	return nil
 }
 
 type grafanaStatus struct {
@@ -558,10 +565,10 @@ func (m *monitoring) warnLegacyConfiguration() {
 	}
 }
 
-func (m *monitoring) downloadDashboards() error {
+func (m *monitoring) downloadDashboards(readURL func(string) ([]byte, error)) error {
 	for _, file := range dashboardFiles {
 		m.cmd.Println(" - ", file)
-		contents, err := GetURLContents(fmt.Sprintf("%s/%s", dashboardBaseURL, file))
+		contents, err := readURL(fmt.Sprintf("%s/%s", dashboardBaseURL, file))
 		if err != nil {
 			return fmt.Errorf("error downloading file %s: %w", file, err)
 		}
@@ -572,14 +579,14 @@ func (m *monitoring) downloadDashboards() error {
 	return nil
 }
 
-func (m *monitoring) downloadDockerComposeFiles() error {
+func (m *monitoring) downloadDockerComposeFiles(readURL func(string) ([]byte, error)) error {
 	baseURL, err := monitoringConfigBaseURL(Version)
 	if err != nil {
 		return err
 	}
 	for _, file := range dockerComposeFiles {
 		m.cmd.Println(" - ", file)
-		contents, err := GetURLContents(fmt.Sprintf("%s/%s", baseURL, file))
+		contents, err := readURL(fmt.Sprintf("%s/%s", baseURL, file))
 		if err != nil {
 			return fmt.Errorf("error downloading file %s: %w", file, err)
 		}
