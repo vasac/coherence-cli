@@ -125,6 +125,7 @@ func TestMonitoringRecoveryFIFO(t *testing.T) {
 					// Only this stub is reachable as docker; no daemon is contacted.
 					bin := t.TempDir()
 					stub := "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$COHCTL_TEST_DOCKER_LOG\"\nif [ \"$COHCTL_TEST_DOCKER_RUNNING\" = 1 ]; then printf 'container-id\\n'; fi\n"
+					// #nosec G306 -- owner-only executable Docker stub in t.TempDir.
 					if err := os.WriteFile(filepath.Join(bin, "docker"), []byte(stub), 0700); err != nil {
 						t.Fatal(err)
 					}
@@ -161,6 +162,7 @@ func assertMonitoringRecoveryStopped(t *testing.T, mon *monitoring, wantBase str
 	if err := mon.ensureMonitoringIsStopped(); err != nil {
 		t.Fatal(err)
 	}
+	// #nosec G703 -- parent test sets this subprocess-only path to its private temporary log.
 	args, err := os.ReadFile(os.Getenv("COHCTL_TEST_DOCKER_LOG"))
 	if err != nil {
 		t.Fatal(err)

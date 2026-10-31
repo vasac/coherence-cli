@@ -334,7 +334,7 @@ func parseLinks(content string, excludes []string) ([]string, map[string][]strin
 		}
 
 		links = make([]string, 0)
-		for link, _ := range linkMap {
+		for link := range linkMap {
 			links = append(links, link)
 		}
 	}

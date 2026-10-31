@@ -321,6 +321,7 @@ func GetRestUrl(restPort int) string {
 
 // IssueGetRequest issues a HTTP GET request using the URL.
 func IssueGetRequest(url string) ([]byte, error) {
+	// #nosec G107 -- integration-test caller selects its local test server; no production or remote request input.
 	resp, err := http.Get(url)
 	if err != nil {
 		return emptyByte, err

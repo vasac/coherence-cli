@@ -56,6 +56,7 @@ case "$COHCTL_TEST_DOCKER_STATE" in
 esac
 `
 	for _, executable := range []string{"docker", dockerCompose} {
+		// #nosec G306 -- owner-only executable Docker stub in t.TempDir; execution is required by this test.
 		if err := os.WriteFile(filepath.Join(bin, executable), []byte(stub), 0700); err != nil {
 			t.Fatal(err)
 		}
@@ -179,6 +180,7 @@ func monitoringDirectorySnapshot(t *testing.T, directory string) map[string]stri
 		}
 		value := info.Mode().String()
 		if !entry.IsDir() {
+			// #nosec G122 -- test-owned t.TempDir tree, with no concurrent writers or attacker-controlled entries.
 			contents, err := os.ReadFile(path)
 			if err != nil {
 				return err

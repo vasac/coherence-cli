@@ -50,9 +50,9 @@ jobs:
       shell: bash
       run: ./scripts/setup-release-gh.sh
 
-    - name: Code Review
+    - name: Lint
       shell: bash
-      run: echo make golangci
+      run: make golangci
 
     - name: Copyright Check
       shell: bash

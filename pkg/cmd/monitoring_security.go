@@ -38,6 +38,7 @@ const (
 // Read the credential once and check the read's exit status before exporting it.
 // Grafana's /run.sh uses an export assignment for __FILE, which can hide a failed
 // read and leave Grafana using its default password. Never delegate this read.
+// #nosec G101 -- shell source reads a generated secret at runtime; this constant contains no credential value.
 const grafanaSecretReadScript = `fail() {
   echo >&2 "cohctl: Grafana administrator secret is missing, unreadable or invalid; restore grafana-admin-password and reinitialize monitoring if necessary"
   exit 1
@@ -239,6 +240,7 @@ func writeMonitoringEnv(directory, bindAddress string) error {
 // Recovery may follow symlinks, but must reject FIFOs and other special files
 // before opening them. Start/get separately require non-symlink bundle artifacts.
 func readRegularMonitoringFile(file string) ([]byte, error) {
+	// #nosec G703 -- fixed bundle filenames under the user's local configuration; recovery intentionally follows local symlinks.
 	info, err := os.Stat(file)
 	if err != nil {
 		return nil, err
@@ -246,6 +248,7 @@ func readRegularMonitoringFile(file string) ([]byte, error) {
 	if !info.Mode().IsRegular() {
 		return nil, fmt.Errorf("%s must resolve to a regular file", file)
 	}
+	// #nosec G703 -- same local recovery path checked above; no downloaded filename reaches this read.
 	return os.ReadFile(file)
 }
 
