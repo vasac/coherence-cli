@@ -9,11 +9,17 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"testing"
+	"time"
+
+	"github.com/spf13/cobra"
 )
 
 func TestClassifyMonitoringBundleFIFO(t *testing.T) {
@@ -45,5 +51,129 @@ func TestClassifyMonitoringBundleInspectionFailure(t *testing.T) {
 	var pathError *os.PathError
 	if mode != monitoringBundleInvalid || !errors.Is(err, syscall.ENOTDIR) || !errors.As(err, &pathError) {
 		t.Fatalf("expected wrapped inspection failure, got mode=%v error=%v", mode, err)
+	}
+}
+
+// A subprocess deadline bounds regressions in os.ReadFile on a FIFO with no writer.
+func TestMonitoringRecoveryFIFO(t *testing.T) {
+	if directory := os.Getenv("COHCTL_TEST_MONITORING_RECOVERY_DIR"); directory != "" {
+		wantBase := os.Getenv("COHCTL_TEST_MONITORING_RECOVERY_BASE")
+		mon := newMonitoringAt(&cobra.Command{}, directory)
+		switch os.Getenv("COHCTL_TEST_MONITORING_RECOVERY_PROBE") {
+		case "arguments":
+			assertMonitoringRecoveryArgs(t, mon, filepath.Join(directory, generatedDockerComposeYAML), defaultMonitoringAddress, false)
+		case "stopped":
+			assertMonitoringRecoveryStopped(t, mon, wantBase)
+		default:
+			assertMonitoringRecovery(t, directory, wantBase, defaultMonitoringAddress, false)
+			assertMonitoringRecoveryStopped(t, mon, wantBase)
+		}
+		return
+	}
+	for _, symlink := range []bool{false, true} {
+		kind := "FIFO"
+		if symlink {
+			kind = "symlink to FIFO"
+		}
+		t.Run(kind, func(t *testing.T) {
+			for _, test := range []struct {
+				name, generated, legacy, env, password, wantBase, probe string
+			}{
+				{"generated fallback", "fifo", "regular", "missing", "missing", dockerComposeYAML, ""},
+				{"environment fallback", "regular", "regular", "fifo", "missing", generatedDockerComposeYAML, ""},
+				{"legacy only", "missing", "fifo", "missing", "missing", "", ""},
+				{"corrupt generated and special legacy", "invalid", "fifo", "missing", "missing", "", ""},
+				{"both special", "fifo", "fifo", "missing", "missing", "", ""},
+				{"generated priority", "regular", "fifo", "missing", "missing", generatedDockerComposeYAML, ""},
+				{"password ignored", "regular", "regular", "missing", "fifo", generatedDockerComposeYAML, ""},
+				{"environment arguments", "regular", "regular", "fifo", "missing", generatedDockerComposeYAML, "arguments"},
+				{"environment stopped check", "regular", "regular", "fifo", "missing", generatedDockerComposeYAML, "stopped"},
+				{"generated stopped check", "fifo", "regular", "missing", "missing", dockerComposeYAML, "stopped"},
+			} {
+				t.Run(test.name, func(t *testing.T) {
+					directory := t.TempDir()
+					for name, artifact := range map[string]string{generatedDockerComposeYAML: test.generated, dockerComposeYAML: test.legacy, monitoringEnvFile: test.env, grafanaPasswordFile: test.password} {
+						file := filepath.Join(directory, name)
+						switch artifact {
+						case "missing":
+							continue
+						case "fifo":
+							if symlink {
+								target := file + "-fifo"
+								monitoringTestSymlink(t, target, file)
+								file = target
+							}
+							if err := syscall.Mkfifo(file, 0600); err != nil {
+								if errors.Is(err, syscall.ENOTSUP) || errors.Is(err, syscall.ENOSYS) {
+									t.Skipf("FIFO creation unavailable: %v", err)
+								}
+								t.Fatal(err)
+							}
+							continue
+						}
+						contents := minimalLegacyCompose()
+						if name == generatedDockerComposeYAML {
+							contents = secureCompose(t)
+						}
+						if artifact == "invalid" {
+							contents = []byte("services: {}")
+						}
+						if err := os.WriteFile(file, contents, 0600); err != nil {
+							t.Fatal(err)
+						}
+					}
+					// Only this stub is reachable as docker; no daemon is contacted.
+					bin := t.TempDir()
+					stub := "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$COHCTL_TEST_DOCKER_LOG\"\nif [ \"$COHCTL_TEST_DOCKER_RUNNING\" = 1 ]; then printf 'container-id\\n'; fi\n"
+					if err := os.WriteFile(filepath.Join(bin, "docker"), []byte(stub), 0700); err != nil {
+						t.Fatal(err)
+					}
+					executable, err := os.Executable()
+					if err != nil {
+						t.Fatal(err)
+					}
+					ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+					defer cancel()
+					command := exec.CommandContext(ctx, executable, "-test.run=^TestMonitoringRecoveryFIFO$", "-test.v")
+					command.Env = append(os.Environ(),
+						"COHCTL_TEST_MONITORING_RECOVERY_DIR="+directory,
+						"COHCTL_TEST_MONITORING_RECOVERY_BASE="+test.wantBase,
+						"COHCTL_TEST_MONITORING_RECOVERY_PROBE="+test.probe,
+						"COHCTL_TEST_DOCKER_LOG="+filepath.Join(bin, "arguments"),
+						"COHCTL_TEST_DOCKER_RUNNING=0",
+						monitoringBindAddressEnv+"=0.0.0.0", "PATH="+bin)
+					output, err := command.CombinedOutput()
+					if ctx.Err() != nil {
+						t.Fatalf("recovery blocked on %s (subprocess deadline): %v\n%s", kind, ctx.Err(), output)
+					}
+					if err != nil {
+						t.Fatalf("recovery subprocess failed: %v\n%s", err, output)
+					}
+				})
+			}
+		})
+	}
+}
+
+func assertMonitoringRecoveryStopped(t *testing.T, mon *monitoring, wantBase string) {
+	t.Helper()
+	useDockerComposeParam = false
+	if err := mon.ensureMonitoringIsStopped(); err != nil {
+		t.Fatal(err)
+	}
+	args, err := os.ReadFile(os.Getenv("COHCTL_TEST_DOCKER_LOG"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantArgs := []string{"ps", "-q", "--filter", "label=com.docker.compose.project=" + monitoringDirectory}
+	if wantBase != "" {
+		wantArgs = []string{"compose", "-f", filepath.Join(mon.monitoringDir, wantBase), "ps", "-q"}
+	}
+	if string(args) != strings.Join(wantArgs, "\n")+"\n" {
+		t.Fatalf("unexpected stopped-check command: %q, want %q", args, wantArgs)
+	}
+	t.Setenv("COHCTL_TEST_DOCKER_RUNNING", "1")
+	if err := mon.ensureMonitoringIsStopped(); err == nil || !strings.Contains(err.Error(), "monitoring containers are running") {
+		t.Fatalf("expected running monitoring containers to prevent reinitialization, got %v", err)
 	}
 }

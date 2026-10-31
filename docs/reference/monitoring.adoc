@@ -170,6 +170,10 @@ cohctl stop monitoring
 Stopping does not require reading or validating the Grafana password.
 This ensures an exposed stack can still be stopped if the password file is missing or has incorrect permissions.
 cohctl prefers a parseable generated Compose file, then a parseable legacy file, and reports both paths when neither is usable.
+Recovery Compose files must resolve to regular files; symlinks to regular files are accepted, while directories, FIFOs and other special files are skipped before reading.
+For generated recovery, an absent, invalid or non-regular `monitoring.env` uses the safe `127.0.0.1` default and is omitted from the Compose arguments.
+A valid persisted address is still used, and an inherited bind-address override cannot replace the selected recovery address.
+These recovery rules also apply when checking whether monitoring is stopped before reinitialization; `start` and `get` retain strict bundle validation.
 
 [source,text]
 ----

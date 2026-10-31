@@ -236,9 +236,22 @@ func writeMonitoringEnv(directory, bindAddress string) error {
 	return writeFileContents(directory, monitoringEnvFile, content)
 }
 
+// Recovery may follow symlinks, but must reject FIFOs and other special files
+// before opening them. Start/get separately require non-symlink bundle artifacts.
+func readRegularMonitoringFile(file string) ([]byte, error) {
+	info, err := os.Stat(file)
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("%s must resolve to a regular file", file)
+	}
+	return os.ReadFile(file)
+}
+
 func readMonitoringEnv(directory string) (string, error) {
 	file := filepath.Join(directory, monitoringEnvFile)
-	contents, err := os.ReadFile(file)
+	contents, err := readRegularMonitoringFile(file)
 	if err != nil {
 		return "", fmt.Errorf("unable to read %s: %w", file, err)
 	}

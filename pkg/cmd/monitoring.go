@@ -520,7 +520,7 @@ func validateGeneratedComposeFile(file string) error {
 }
 
 func validateComposeServicesFile(file string) error {
-	contents, err := os.ReadFile(file)
+	contents, err := readRegularMonitoringFile(file)
 	if err != nil {
 		return fmt.Errorf("unable to read compose file %s: %w", file, err)
 	}

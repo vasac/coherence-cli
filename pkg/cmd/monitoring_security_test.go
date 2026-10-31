@@ -616,6 +616,102 @@ func TestComposeForStopSelection(t *testing.T) {
 	}
 }
 
+// Recovery follows symlinks to regular files; start/get retain stricter classification.
+func TestComposeForStopRecoveryFiles(t *testing.T) {
+	for _, test := range []struct {
+		name, generated, legacy, env, wantBase, wantAddress string
+		wantEnv                                             bool
+	}{
+		{"generated directory", "directory", "regular", "missing", dockerComposeYAML, defaultMonitoringAddress, false},
+		{"legacy directory", "missing", "directory", "missing", "", "", false},
+		{"both directories", "directory", "directory", "missing", "", "", false},
+		{"generated symlink", "symlink", "regular", "regular", generatedDockerComposeYAML, "::1", true},
+		{"legacy symlink", "missing", "symlink", "missing", dockerComposeYAML, defaultMonitoringAddress, false},
+		{"dangling generated symlink", "dangling", "regular", "missing", dockerComposeYAML, defaultMonitoringAddress, false},
+		{"dangling legacy symlink", "missing", "dangling", "missing", "", "", false},
+		{"missing environment", "regular", "regular", "missing", generatedDockerComposeYAML, defaultMonitoringAddress, false},
+		{"invalid environment", "regular", "regular", "invalid", generatedDockerComposeYAML, defaultMonitoringAddress, false},
+		{"environment directory", "regular", "regular", "directory", generatedDockerComposeYAML, defaultMonitoringAddress, false},
+		{"dangling environment symlink", "regular", "regular", "dangling", generatedDockerComposeYAML, defaultMonitoringAddress, false},
+		{"environment symlink", "regular", "regular", "symlink", generatedDockerComposeYAML, "::1", true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv(monitoringBindAddressEnv, "0.0.0.0")
+			directory := t.TempDir()
+			for name, kind := range map[string]string{generatedDockerComposeYAML: test.generated, dockerComposeYAML: test.legacy, monitoringEnvFile: test.env} {
+				file := filepath.Join(directory, name)
+				contents := minimalLegacyCompose()
+				if name == generatedDockerComposeYAML {
+					contents = secureCompose(t)
+				}
+				if name == monitoringEnvFile {
+					contents = []byte(monitoringBindAddressEnv + "=::1\n")
+				}
+				switch kind {
+				case "missing":
+					continue
+				case "directory":
+					if err := os.Mkdir(file, 0700); err != nil {
+						t.Fatal(err)
+					}
+					continue
+				case "dangling":
+					monitoringTestSymlink(t, file+"-absent", file)
+					continue
+				case "symlink":
+					target := file + "-target"
+					monitoringTestSymlink(t, target, file)
+					file = target
+				case "invalid":
+					contents = []byte(monitoringBindAddressEnv + "=invalid\n")
+				}
+				if err := os.WriteFile(file, contents, 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			assertMonitoringRecovery(t, directory, test.wantBase, test.wantAddress, test.wantEnv)
+		})
+	}
+}
+
+func assertMonitoringRecovery(t *testing.T, directory, wantBase, wantAddress string, wantEnv bool) {
+	t.Helper()
+	mon := newMonitoringAt(&cobra.Command{}, directory)
+	file, address, generated, err := mon.composeForStop()
+	if wantBase == "" {
+		if err == nil || file != "" || address != "" || generated ||
+			!strings.Contains(err.Error(), filepath.Join(directory, generatedDockerComposeYAML)) ||
+			!strings.Contains(err.Error(), filepath.Join(directory, dockerComposeYAML)) ||
+			!strings.Contains(err.Error(), "restore one of these files") {
+			t.Fatalf("expected actionable recovery error for both models, got file=%s address=%s generated=%v error=%v", file, address, generated, err)
+		}
+		return
+	}
+	if err != nil || file != filepath.Join(directory, wantBase) || address != wantAddress || generated != (wantBase == generatedDockerComposeYAML) {
+		t.Fatalf("unexpected recovery selection: file=%s address=%s generated=%v error=%v", file, address, generated, err)
+	}
+	assertMonitoringRecoveryArgs(t, mon, file, address, wantEnv)
+}
+
+func assertMonitoringRecoveryArgs(t *testing.T, mon *monitoring, file, address string, wantEnv bool) {
+	t.Helper()
+	args, environment := mon.composeArgs(file, address, []string{"down"})
+	wantArgs := []string{"-f", file, "down"}
+	if wantEnv {
+		wantArgs = append([]string{"--env-file", filepath.Join(filepath.Dir(file), monitoringEnvFile)}, wantArgs...)
+	}
+	if strings.Join(args, "\n") != strings.Join(wantArgs, "\n") {
+		t.Fatalf("unexpected recovery arguments: %q, want %q", args, wantArgs)
+	}
+	if filepath.Base(file) == generatedDockerComposeYAML {
+		if len(environment) != 1 || environment[0] != monitoringBindAddressEnv+"="+address {
+			t.Fatalf("expected explicit validated/default bind address, got %q", environment)
+		}
+	} else if len(environment) != 0 {
+		t.Fatalf("unexpected legacy environment override: %q", environment)
+	}
+}
+
 func TestInstallStagedDirectoryReplacesCompleteDirectory(t *testing.T) {
 	parent := t.TempDir()
 	active := filepath.Join(parent, "monitoring")
