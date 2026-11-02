@@ -54,7 +54,11 @@ class Checksums(unittest.TestCase):
         (mock / "curl").write_text('''#!/usr/bin/env python3
 import os, pathlib, shutil, sys
 args = sys.argv[1:]
-assert all(flag in args for flag in ['--retry', '--retry-all-errors', '--retry-max-time', '--connect-timeout', '--max-time'])
+assert '-fsSL' in args and '--retry-all-errors' in args
+for option, value in {'--retry': '5', '--retry-delay': '2', '--retry-max-time': '600',
+                      '--connect-timeout': '10', '--max-time': '180'}.items():
+    assert args.count(option) == 1, f'Expected one {option}: {args}'
+    assert args[args.index(option) + 1] == value, f'Expected {option} {value}: {args}'
 if os.environ['FAIL_DOWNLOAD'] == 'true': sys.exit(22)
 shutil.copyfile(pathlib.Path(os.environ['PUBLIC']) / args[-1].rsplit('/', 1)[1], args[args.index('-o') + 1])
 ''')
