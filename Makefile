@@ -15,7 +15,7 @@
 # ======================================================================================================================
 
 # The version of the CLI being build - this should be a valid SemVer format
-VERSION ?= 1.10.14
+VERSION ?= 1.10.15
 MILESTONE ?=
 SHELL := /bin/bash
 
@@ -375,6 +375,7 @@ copyright: getcopyright ## Check copyright headers
 	  -X mvnw.cmd \
 	  -X .png \
 	  -X .sh \
+	  -X ./scripts/test-install-docs.ps1 \
 	  -X temp/ \
 	  -X /test-report.xml \
 	  -X THIRD_PARTY_LICENSES.txt \
@@ -454,6 +455,22 @@ test-cohctl: test-clean gotestsum $(BUILD_PROPS) ## Run the CLI unit tests
 	CGO_ENABLED=0 $(GOTESTSUM) --format testname --junitfile $(TEST_LOGS_DIR)/cohctl-test.xml \
 	  -- $(GO_TEST_FLAGS) -v -coverprofile=$(COVERAGE_DIR)/cover-unit.out ./pkg/cmd/... ./pkg/utils/...
 	go tool cover -html=$(COVERAGE_DIR)/cover-unit.out -o $(COVERAGE_DIR)/cover-unit.html
+
+# ----------------------------------------------------------------------------------------------------------------------
+# Executes the installer integrity tests
+# ----------------------------------------------------------------------------------------------------------------------
+.PHONY: test-install
+test-install: ## Run the hermetic installer integrity tests
+	./scripts/test-install.sh
+
+.PHONY: test-checksums
+test-checksums: ## Test checksum generation and public-release verification
+	python3 ./scripts/test-checksums.py
+
+.PHONY: test-install-docs
+test-install-docs: ## Exercise documented Bash and PowerShell procedures
+	python3 ./scripts/test-install-docs.py
+	pwsh -NoProfile -File ./scripts/test-install-docs.ps1
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Executes the Go end to end tests for standalone Coherence

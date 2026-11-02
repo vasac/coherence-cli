@@ -72,6 +72,10 @@ jobs:
       shell: bash
       run: make test-cohctl
 
+    - name: Installer Tests
+      shell: bash
+      run: make test-install test-checksums test-install-docs
+
     - name: E2E Local Tests
       shell: bash
       run: |
