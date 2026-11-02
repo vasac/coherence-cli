@@ -24,9 +24,11 @@ assets=("cohctl-${version}-linux-amd64" "cohctl-${version}-linux-arm64"
 
 download() {
     # Newly uploaded assets can take time to become publicly downloadable.
-    # Bound both retries and request duration, including HTTP availability errors.
-    curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 --retry-max-time 120 \
-        --connect-timeout 10 --max-time 30 -o "${temp}/$1" "${url}/$1"
+    # Allow slow transfers and retry HTTP availability errors.
+    # The retry window limits when another attempt starts; the final attempt
+    # may finish after the window.
+    curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 --retry-max-time 600 \
+        --connect-timeout 10 --max-time 180 -o "${temp}/$1" "${url}/$1"
 }
 
 download "${manifest}"
