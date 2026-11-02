@@ -60,12 +60,12 @@ The CLI complements your existing Coherence management tools and allows you to:
 
 The Coherence CLI is available for macOS, Linux and Windows for x86 and Arm based processors.
 
-### Mac / Linux
+### Linux
 
-For macOS and Linux platforms, use the following to install the latest version of the CLI:
+On Linux, the installer downloads the release checksum manifest and verifies the selected binary before making it executable or copying it to `/usr/local/bin`:
 
 ```bash
-curl -sL https://raw.githubusercontent.com/oracle/coherence-cli/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/oracle/coherence-cli/main/scripts/install.sh | bash
 ```
 
 When you install the CLI, normally administrative privileges are required as the `cohctl` executable is moved to the `/usr/local/bin` directory.
@@ -73,15 +73,49 @@ When you install the CLI, normally administrative privileges are required as the
 If you do not want to copy to `/usr/local/bin` automatically, you can set the following environment variable `export COPY=false`, before running the above to download only and then
 manually copy to your desired location.
 
-### Windows
+As a first-class alternative to piping the installer into Bash, download and verify the Linux artifact manually:
 
-For Windows, use the curl command below, then copy `cohctl.exe` to a directory in your PATH:
+```bash
+(
+set -euo pipefail
+VERSION=$(curl -fsSL https://oracle.github.io/coherence-cli/stable.txt)
+while [[ "${VERSION}" == *$'\r' ]]; do VERSION=${VERSION%$'\r'}; done
+[[ "${VERSION}" =~ ^[0-9A-Za-z][0-9A-Za-z._-]*$ ]] || { echo "Invalid version" >&2; exit 1; }
+ARCH=amd64 # use arm64 on Arm systems
+ASSET="cohctl-${VERSION}-linux-${ARCH}"
+MANIFEST="cohctl-${VERSION}-checksums.txt"
+RELEASE_URL="https://github.com/oracle/coherence-cli/releases/download/${VERSION}"
+DESTINATION="${PWD}/${ASSET}"
+TEMP=$(mktemp -d)
+trap 'rm -rf -- "${TEMP}"' EXIT
+cd "${TEMP}"
 
-```cmd
-curl -sLo cohctl.exe "https://github.com/oracle/coherence-cli/releases/download/1.10.14/cohctl-1.10.14-windows-amd64.exe"
+curl -fsSL -o "${ASSET}" "${RELEASE_URL}/${ASSET}"
+curl -fsSL -o "${MANIFEST}" "${RELEASE_URL}/${MANIFEST}"
+awk -v target="${ASSET}" '
+    $2 == target {
+        matches++
+        if (NF == 2 && length($1) == 64 && $1 !~ /[^0-9a-f]/) {
+            valid++
+            entry = $1 "  " $2
+        }
+    }
+    END {
+        if (matches != 1 || valid != 1) exit 1
+        print entry
+    }
+' "${MANIFEST}" > "${ASSET}.sha256"
+sha256sum -c "${ASSET}.sha256"
+chmod u+x "${ASSET}"
+mv -- "${ASSET}" "${DESTINATION}"
+)
 ```
 
-> Note: Change the **amd64** to **arm** for ARM based processor in the URL above.
+### Windows
+
+Follow the complete [PowerShell download and verification procedure](https://docs.coherence.community/coherence-cli/docs/latest/docs/installation/installation#install-windows) in the Install guide. It verifies the selected Windows executable before copying it to a directory in your `PATH`; use `amd64` or `arm64` for your processor.
+
+Release checksums detect corruption or mismatched downloads. Because the manifest is distributed with the release, it does not provide independent provenance if both the artifact and manifest are compromised.
 
 See the [Install guide](https://docs.coherence.community/coherence-cli/docs/latest/docs/installation/installation) for
 more information on downloading and installing the CLI.
