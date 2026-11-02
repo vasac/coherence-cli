@@ -113,7 +113,55 @@ mv -- "${ASSET}" "${DESTINATION}"
 
 ### Windows
 
-Follow the complete [PowerShell download and verification procedure](https://docs.coherence.community/coherence-cli/docs/latest/docs/installation/installation#install-windows) in the Install guide. It verifies the selected Windows executable before copying it to a directory in your `PATH`; use `amd64` or `arm64` for your processor.
+Download a Windows executable using the following command in Command Prompt or PowerShell, then copy `cohctl.exe` to a directory on your `PATH`:
+
+```cmd
+curl.exe -fLo cohctl.exe "https://github.com/oracle/coherence-cli/releases/download/1.10.14/cohctl-1.10.14-windows-amd64.exe"
+```
+
+The example downloads `1.10.14` for x86-64. Replace `1.10.14` in both places with your desired [released version](https://github.com/oracle/coherence-cli/releases), or change `amd64` to `arm64` for Arm.
+
+The command above only downloads the executable. To download and verify the latest stable Windows executable using SHA-256 checksums, use the PowerShell procedure below. Use `amd64` for x86-64 or change it to `arm64` for Arm. Before running, replace `C:\path\on\your\PATH\cohctl.exe` with your chosen destination in a directory on your `PATH`.
+
+<details>
+<summary>Show PowerShell installation commands</summary>
+
+```powershell
+& {
+    $ErrorActionPreference = 'Stop'
+    Set-StrictMode -Version Latest
+    $Version = (Invoke-WebRequest "https://oracle.github.io/coherence-cli/stable.txt" -UseBasicParsing -ErrorAction Stop).Content.TrimEnd("`r", "`n")
+    if ($Version -cnotmatch '\A[0-9A-Za-z][0-9A-Za-z._-]*\z') { throw 'Invalid version' }
+    $Asset = "cohctl-$Version-windows-amd64.exe"
+    $Manifest = "cohctl-$Version-checksums.txt"
+    $ReleaseUrl = "https://github.com/oracle/coherence-cli/releases/download/$Version"
+    $Temp = Join-Path ([IO.Path]::GetTempPath()) ([Guid]::NewGuid().ToString())
+    $null = New-Item -ItemType Directory -Path $Temp
+    try {
+        $BinaryPath = Join-Path $Temp $Asset
+        $ManifestPath = Join-Path $Temp $Manifest
+        Invoke-WebRequest "$ReleaseUrl/$Asset" -OutFile $BinaryPath -ErrorAction Stop
+        Invoke-WebRequest "$ReleaseUrl/$Manifest" -OutFile $ManifestPath -ErrorAction Stop
+        $Entries = @(Get-Content -LiteralPath $ManifestPath -ErrorAction Stop | Where-Object {
+            $Fields = $_ -split '\s+'
+            $Fields.Count -ge 2 -and $Fields[1] -ceq $Asset
+        })
+        if ($Entries.Count -ne 1) { throw "Expected exactly one checksum entry for $Asset" }
+        $Pattern = '\A([0-9a-f]{64})  ' + [regex]::Escape($Asset) + '\z'
+        if ($Entries[0] -cnotmatch $Pattern) { throw "Malformed checksum entry for $Asset" }
+        $Expected = $Matches[1]
+        $Actual = (Get-FileHash -LiteralPath $BinaryPath -Algorithm SHA256 -ErrorAction Stop).Hash.ToLowerInvariant()
+        if ($Actual -cne $Expected) { throw "Checksum verification failed for $Asset" }
+        Copy-Item -LiteralPath $BinaryPath -Destination C:\path\on\your\PATH\cohctl.exe -ErrorAction Stop
+    } finally {
+        Remove-Item -LiteralPath $Temp -Recurse -Force -ErrorAction Stop
+    }
+}
+```
+
+</details>
+
+For additional information, see the [Install guide](https://docs.coherence.community/coherence-cli/docs/latest/docs/installation/installation#install-windows).
 
 Release checksums detect corruption or mismatched downloads. Because the manifest is distributed with the release, it does not provide independent provenance if both the artifact and manifest are compromised.
 
