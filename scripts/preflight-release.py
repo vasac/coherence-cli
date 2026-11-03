@@ -50,10 +50,16 @@ def run(command, env=None):
 def check_release(gh, repository, ref, sha, env):
     prefix = f"repos/{repository}"
 
-    def api(endpoint, paginate=False):
-        command = [gh, "api", "--hostname", "github.com", "--method", "GET",
+    def api(endpoint, paginate=False, generate_notes=False):
+        command = [gh, "api", "--hostname", "github.com", "--method", "POST" if generate_notes else "GET",
                    "--header", "Accept: application/vnd.github+json",
                    "--header", "X-GitHub-Api-Version: 2022-11-28"]
+        if generate_notes:
+            # This POST only computes notes; GitHub saves no release or tag.
+            require(endpoint == f"{prefix}/releases/generate-notes" and not paginate,
+                    "Invalid release permission probe.")
+            command += ["--raw-field", f"tag_name={ref[len('refs/tags/'):]}",
+                        "--raw-field", f"target_commitish={sha}"]
         if paginate:
             command += ["--paginate", "--slurp"]
         try:
@@ -61,17 +67,13 @@ def check_release(gh, repository, ref, sha, env):
         except (ValueError, UnicodeError) as error:
             raise PreflightError("Malformed GitHub API response; release validation stopped.") from error
 
-    # A public, read-only listing can silently omit drafts. Require push access
-    # before relying on the release list, using the same token for every lookup.
+    # Repository permissions describe user roles, not installation-token grants.
+    # Check identity here; prove draft visibility separately before listing.
     repo = api(prefix)
     require(isinstance(repo, dict)
             and isinstance(repo.get("full_name"), str)
             and repo["full_name"].lower() == repository.lower(),
             "GitHub API returned a different or malformed repository identity.")
-    permissions = repo.get("permissions")
-    require(isinstance(permissions, dict) and permissions.get("push") is True,
-            "Cannot verify repository push access required to see draft releases.")
-
     remote = api(f"{prefix}/git/ref/tags/{quote(ref[len('refs/tags/'):], safe='')}")
     require(isinstance(remote, dict) and remote.get("ref") == ref,
             "Remote tag reference is missing or does not match the triggering tag.")
@@ -86,6 +88,17 @@ def check_release(gh, repository, ref, sha, env):
                 "Malformed annotated tag identity.")
         kind, resolved = target(tag.get("object"))
     require(resolved == sha, "Remote tag commit does not match the triggering/checked-out commit.")
+
+    # A public release list can silently omit drafts. The non-persisting notes
+    # endpoint requires Contents: write, including for GITHUB_TOKEN/App tokens:
+    # https://docs.github.com/en/rest/releases/releases#generate-release-notes-content-for-a-release
+    # Use the same token and exact repository. Discard the notes; publication
+    # retains its existing title/body. Neither a public GET nor an endpoint's
+    # X-Accepted-GitHub-Permissions header proves the token has this authority.
+    notes = api(f"{prefix}/releases/generate-notes", generate_notes=True)
+    require(isinstance(notes, dict) and isinstance(notes.get("name"), str)
+            and isinstance(notes.get("body"), str),
+            "Cannot verify Contents: write authority required to see draft releases: malformed notes response.")
 
     # Do not use the published-only releases/tags endpoint or infer absence from
     # a failed command. gh 2.103.3 follows Link pagination and slurps each page.
@@ -134,8 +147,8 @@ def main():
         env["GH_CONFIG_DIR"] = config
         check_release(gh, repository, ref, sha, env)
     print(f"Release preflight passed for {repository} {ref} at {sha}.")
-    # This is a snapshot, not an atomic lock against external actors. A future
-    # gh release create replacement must also use --verify-tag at creation time.
+    # This is a snapshot, not an atomic lock against external actors. The
+    # publication helper also uses --verify-tag at creation time.
 
 
 if __name__ == "__main__":

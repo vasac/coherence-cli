@@ -27,6 +27,17 @@ VERSION = "1.10.15"
 TAG_SHA = "a" * 40
 OTHER_SHA = "b" * 40
 REAL_GH = os.environ.get("RELEASE_PREFLIGHT_TEST_GH")
+NOTES = f"{PREFIX}/releases/generate-notes"
+# Reduced contract fixtures, not captured responses from a hosted run.
+# GitHub's full-repository schema makes permissions optional and its role
+# fields boolean. The notes response uses
+# the documented name/body contract and requires Contents: write:
+# https://github.com/github/rest-api-description/blob/main/descriptions/api.github.com/api.github.com.json
+# https://docs.github.com/en/rest/releases/releases#generate-release-notes-content-for-a-release
+ACTIONS_REPOSITORY = {"full_name": REPOSITORY, "permissions": {
+    "admin": False, "maintain": False, "push": False, "triage": False, "pull": False}}
+GENERATED_NOTES = {"name": "Release v1.0.0 is now available!",
+                   "body": "##Changes in Release v1.0.0 ... ##Contributors @monalisa"}
 
 
 def release(tag, draft=False, identity=1):
@@ -51,6 +62,7 @@ class Preflight(unittest.TestCase):
             PREFIX: {"full_name": REPOSITORY, "permissions": {"push": True}},
             f"{PREFIX}/git/ref/tags/{VERSION}": {
                 "ref": f"refs/tags/{VERSION}", "object": {"type": "commit", "sha": self.sha}},
+            NOTES: GENERATED_NOTES,
             f"{PREFIX}/releases?per_page=100": [[]],
         }
         self.events = self.root / "events.jsonl"
@@ -60,11 +72,13 @@ class Preflight(unittest.TestCase):
         self.gh.write_text(f'''#!{sys.executable}
 import json, os, pathlib, sys
 args = sys.argv[1:]
-assert args[:7] == ['api', '--hostname', 'github.com', '--method', 'GET', '--header', 'Accept: application/vnd.github+json'], args
-assert args[7:9] == ['--header', 'X-GitHub-Api-Version: 2022-11-28'], args
 endpoint = args[-1]
+notes = endpoint == {NOTES!r}
+assert args[:7] == ['api', '--hostname', 'github.com', '--method', 'POST' if notes else 'GET', '--header', 'Accept: application/vnd.github+json'], args
+assert args[7:9] == ['--header', 'X-GitHub-Api-Version: 2022-11-28'], args
 assert endpoint.startswith({PREFIX!r}), endpoint
-assert args[9:-1] == (['--paginate', '--slurp'] if '/releases?' in endpoint else []), args
+expected = ['--raw-field', 'tag_name=' + os.environ['RELEASE_VERSION'], '--raw-field', 'target_commitish=' + os.environ['RELEASE_SHA']] if notes else (['--paginate', '--slurp'] if '/releases?' in endpoint else [])
+assert args[9:-1] == expected, args
 assert os.environ['GH_TOKEN'] == 'fixture-token'
 assert not any(k in os.environ for k in ('GITHUB_TOKEN', 'GH_ENTERPRISE_TOKEN', 'GITHUB_ENTERPRISE_TOKEN', 'GH_DEBUG'))
 assert os.environ['GH_PROMPT_DISABLED'] == '1'
@@ -101,6 +115,7 @@ else:
                         GH_DEBUG="api", GITHUB_TOKEN="wrong-token", GH_ENTERPRISE_TOKEN="wrong-token",
                         GITHUB_ENTERPRISE_TOKEN="wrong-token", PATH=f"{mock}:{os.environ['PATH']}")
         self.http_events = []
+        self.http_posts = []
         if REAL_GH:
             self.start_api_fixture()
 
@@ -113,6 +128,18 @@ else:
 
         class Handler(BaseHTTPRequestHandler):
             def do_GET(self):
+                self.respond()
+
+            def do_POST(self):
+                body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                case.http_posts.append((self.path, body))
+                if self.path != "/" + NOTES or body != {
+                        "tag_name": case.env["RELEASE_VERSION"], "target_commitish": case.env["RELEASE_SHA"]}:
+                    self.send_error(400)
+                    return
+                self.respond()
+
+            def respond(self):
                 endpoint = self.path.lstrip("/")
                 case.http_events.append(endpoint)
                 response = case.responses.get(endpoint, {"_exit": 1})
@@ -131,6 +158,9 @@ else:
                     body = json.dumps(payload)
                 self.send_response(status)
                 self.send_header("Content-Type", "application/json")
+                # This header describes endpoint requirements, not grants. It
+                # must not turn a denied or malformed response into authority.
+                self.send_header("X-Accepted-GitHub-Permissions", "contents=write")
                 if status == 200 and paginated and len(response) > 1:
                     next_endpoint = endpoint + "&page=2"
                     case.responses[next_endpoint] = response[1:]
@@ -158,7 +188,7 @@ else:
         # Run the real gate command copied from the workflow. A fake publication
         # marker after it models normal Actions success-only step execution.
         command = WORKFLOW.split("    - name: Validate release identity and absence\n", 1)[1]
-        command = command.split("\n    - name: Create Release", 1)[0].split("      run: ", 1)[1].strip()
+        command = command.split("\n    - name: Create, validate and publish release", 1)[0].split("      run: ", 1)[1].strip()
         helper = self.repo / "scripts"
         helper.mkdir(exist_ok=True)
         shutil.copyfile(SCRIPTS / "preflight-release.py", helper / "preflight-release.py")
@@ -185,7 +215,38 @@ else:
         self.assertTrue((self.root / "published").exists())
         self.assertIn(self.sha, result.stdout)
         events = [json.loads(line) for line in self.events.read_text().splitlines()]
-        self.assertEqual([args[-1] for args in events], list(self.responses)[:3])
+        self.assertEqual([args[-1] for args in events], list(self.responses)[:4])
+
+    def test_actions_token_repository_response_with_server_authority_succeeds(self):
+        for repo in (ACTIONS_REPOSITORY, {"full_name": REPOSITORY}):
+            with self.subTest(repo=repo):
+                self.responses[PREFIX] = repo
+                result = self.invoke()
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertNotIn(GENERATED_NOTES["body"], result.stdout + result.stderr)
+        if REAL_GH:
+            self.assertEqual(self.http_posts, [("/" + NOTES, {
+                "tag_name": VERSION, "target_commitish": self.sha})] * 2)
+
+    def test_repository_push_role_cannot_replace_token_authority(self):
+        for repo in (self.responses[PREFIX], ACTIONS_REPOSITORY, {"full_name": REPOSITORY}):
+            with self.subTest(repo=repo):
+                self.responses[PREFIX] = repo
+                self.responses[NOTES] = {"_exit": 1, "_status": 403,
+                                         "_stdout": json.dumps(GENERATED_NOTES)}
+                self.failed("Read-only command failed")
+        events = [json.loads(line)[-1] for line in self.events.read_text().splitlines()]
+        self.assertNotIn(f"{PREFIX}/releases?per_page=100", events)
+
+    def test_malformed_authority_response_stops_before_release_listing(self):
+        self.responses[PREFIX] = ACTIONS_REPOSITORY
+        for response in (None, [], {}, {"message": "not authorized"}, {"name": "notes"}, {"body": "notes"},
+                         {"name": True, "body": "notes"}, {"name": "notes", "body": []}):
+            with self.subTest(response=response):
+                self.responses[NOTES] = response
+                self.failed("Cannot verify Contents: write authority")
+        events = [json.loads(line)[-1] for line in self.events.read_text().splitlines()]
+        self.assertNotIn(f"{PREFIX}/releases?per_page=100", events)
 
     def test_annotated_and_nested_tag_success(self):
         target_sha, kind = self.sha, "commit"
@@ -264,14 +325,14 @@ else:
                     self.failed("Read-only command failed")
             self.responses[endpoint] = original
 
-    def test_malformed_repository_or_unverified_draft_visibility(self):
+    def test_malformed_or_wrong_repository_stops_before_permission_probe(self):
         for response in ([], None, {}, {"full_name": "other/repo", "permissions": {"push": True}},
-                         {"full_name": REPOSITORY},
-                         {"full_name": REPOSITORY, "permissions": {"push": False}},
-                         {"full_name": REPOSITORY, "permissions": {"push": "true"}}):
+                         {"full_name": True}):
             with self.subTest(response=response):
                 self.responses[PREFIX] = response
                 self.failed()
+        events = [json.loads(line)[-1] for line in self.events.read_text().splitlines()]
+        self.assertNotIn(NOTES, events)
 
     def test_malformed_ref_and_tag_objects_fail(self):
         endpoint = f"{PREFIX}/git/ref/tags/{VERSION}"
@@ -291,6 +352,7 @@ else:
                 self.failed()
 
     def test_existing_drafts_and_published_releases_on_later_pages(self):
+        self.responses[PREFIX] = ACTIONS_REPOSITORY
         for draft in (False, True):
             for page in (0, 2):
                 with self.subTest(draft=draft, page=page):
@@ -342,18 +404,19 @@ else:
 class Workflow(unittest.TestCase):
     def test_gate_is_immediately_before_creation_and_uses_scoped_context(self):
         gate = WORKFLOW.split("    - name: Validate release identity and absence\n", 1)[1]
-        gate, creation = gate.split("    - name: Create Release\n", 1)
+        gate, creation = gate.split("    - name: Create, validate and publish release\n", 1)
         self.assertIn("      run: python3 ./scripts/preflight-release.py\n\n", gate)
         expected = {"RELEASE_GH": "steps.release_gh.outputs.path", "RELEASE_VERSION": "steps.version.outputs.version",
                     "RELEASE_REPOSITORY": "github.repository", "RELEASE_REF": "github.ref",
                     "RELEASE_REF_TYPE": "github.ref_type", "RELEASE_SHA": "github.sha", "GH_TOKEN": "github.token"}
         for key, value in expected.items():
             self.assertIn("        " + key + ": ${{ " + value + " }}", gate)
-        self.assertEqual(len(re.findall(r"^\s+GH_TOKEN:", WORKFLOW, re.MULTILINE)), 1)
+        self.assertEqual(len(re.findall(r"^\s+GH_TOKEN:", WORKFLOW, re.MULTILINE)), 2)
         self.assertNotIn("${{", gate.split("      run: ", 1)[1])
         self.assertNotRegex(gate, r"(?m)^\s+if:")
-        self.assertNotRegex(creation.split("    - name: Upload", 1)[0], r"(?m)^\s+if:")
-        self.assertIn("uses: actions/create-release@0cb9c9b65d5d1901c1f53e5e66eaf4afd303e70e", creation)
+        self.assertNotRegex(creation.split("    - name: Verify public release downloads", 1)[0], r"(?m)^\s+if:")
+        self.assertIn("      run: python3 ./scripts/publish-release.py\n", creation)
+        self.assertNotIn("actions/create-release@", creation)
         self.assertIn("make test-release-gh test-release-preflight", WORKFLOW)
         self.assertIn("permissions:\n  contents: write\n", WORKFLOW)
 

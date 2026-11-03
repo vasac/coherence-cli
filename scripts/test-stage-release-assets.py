@@ -297,7 +297,7 @@ class Workflow(unittest.TestCase):
         steps = re.findall(r"^    - name: (.+)$", WORKFLOW, re.MULTILINE)
         start = steps.index("Generate SHA-256 checksums")
         self.assertEqual(steps[start:start + 4], ["Generate SHA-256 checksums", "Stage and verify release assets",
-                                                "Validate release identity and absence", "Create Release"])
+                                                "Validate release identity and absence", "Create, validate and publish release"])
         self.assertIn("      id: release_assets\n", STEP)
         self.assertIn("        RELEASE_VERSION: ${{ steps.version.outputs.version }}\n", STEP)
         self.assertEqual(COMMAND, "python3 ./scripts/stage-release-assets.py")
@@ -306,9 +306,10 @@ class Workflow(unittest.TestCase):
         for name in steps[start:start + 4]:
             step = WORKFLOW.split(f"    - name: {name}\n", 1)[1].split("    - name: ", 1)[0]
             self.assertNotRegex(step, r"(?m)^\s+(if|continue-on-error):")
-        self.assertIn("make test-release-gh test-release-preflight test-release-staging\n", WORKFLOW)
-        self.assertIn("uses: actions/create-release@0cb9c9b65d5d1901c1f53e5e66eaf4afd303e70e", WORKFLOW)
-        self.assertEqual(WORKFLOW.count("uses: actions/upload-release-asset@"), 7)
+        self.assertIn("make test-release-gh test-release-preflight test-release-staging test-release-publication\n", WORKFLOW)
+        self.assertNotIn("actions/create-release@", WORKFLOW)
+        self.assertNotIn("actions/upload-release-asset@", WORKFLOW)
+        self.assertIn("        RELEASE_ASSETS: ${{ steps.release_assets.outputs.path }}\n", WORKFLOW)
 
 
 if __name__ == "__main__":
