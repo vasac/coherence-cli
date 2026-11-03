@@ -475,6 +475,10 @@ test-release-gh: ## Test the pinned release GitHub CLI setup without network acc
 test-release-preflight: ## Test the read-only release identity and absence gate
 	python3 ./scripts/test-preflight-release.py
 
+.PHONY: test-release-staging
+test-release-staging: ## Test exact release asset staging and checksum validation
+	python3 ./scripts/test-stage-release-assets.py
+
 .PHONY: test-install-docs
 test-install-docs: ## Exercise documented Bash and PowerShell procedures
 	python3 ./scripts/test-install-docs.py

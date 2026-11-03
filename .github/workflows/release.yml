@@ -41,9 +41,9 @@ jobs:
       with:
         go-version-file: 'go.mod'
 
-    - name: Release CLI setup and preflight tests
+    - name: Release CLI setup, preflight and staging tests
       shell: bash
-      run: make test-release-gh test-release-preflight
+      run: make test-release-gh test-release-preflight test-release-staging
 
     - name: Set up pinned GitHub CLI
       id: release_gh
@@ -98,6 +98,13 @@ jobs:
       env:
         RELEASE_VERSION: ${{ steps.version.outputs.version }}
       run: ./scripts/generate-checksums.sh "$RELEASE_VERSION" ./bin ./build/_output/docs.zip "cohctl-${RELEASE_VERSION}-checksums.txt"
+
+    - name: Stage and verify release assets
+      id: release_assets
+      shell: bash
+      env:
+        RELEASE_VERSION: ${{ steps.version.outputs.version }}
+      run: python3 ./scripts/stage-release-assets.py
 
     - name: Validate release identity and absence
       shell: bash
