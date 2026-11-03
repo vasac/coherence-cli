@@ -36,6 +36,15 @@ jobs:
       with:
         go-version-file: 'go.mod'
 
+    - name: Release CLI setup tests
+      shell: bash
+      run: make test-release-gh
+
+    - name: Set up pinned GitHub CLI
+      id: release_gh
+      shell: bash
+      run: ./scripts/setup-release-gh.sh
+
     - name: Code Review
       shell: bash
       run: echo make golangci
