@@ -263,8 +263,8 @@ class Workflow(unittest.TestCase):
         self.assertNotIn("TOKEN", VERIFY_STEP)
         self.assertNotRegex(VERIFY_STEP, r"(?m)^\s+(if|continue-on-error):")
         steps = re.findall(r"^    - name: (.+)$", WORKFLOW, re.MULTILINE)
-        start = steps.index("Upload SHA-256 checksums")
-        self.assertEqual(steps[start:start + 3], ["Upload SHA-256 checksums", "Verify public release downloads",
+        start = steps.index("Create, validate and publish release")
+        self.assertEqual(steps[start:start + 3], ["Create, validate and publish release", "Verify public release downloads",
                                                 "Release GitHub Pages Stable.txt"])
         self.assertIn("make test-install test-checksums test-install-docs\n", WORKFLOW)
 

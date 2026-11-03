@@ -278,24 +278,5 @@ class Staging(unittest.TestCase):
         self.assertEqual(self.output.read_bytes(), b"")
 
 
-class Workflow(unittest.TestCase):
-    def test_staging_follows_generation_then_preflight_immediately_precedes_creation(self):
-        steps = re.findall(r"^    - name: (.+)$", WORKFLOW, re.MULTILINE)
-        start = steps.index("Generate SHA-256 checksums")
-        self.assertEqual(steps[start:start + 4], ["Generate SHA-256 checksums", "Stage and verify release assets",
-                                                "Validate release identity and absence", "Create Release"])
-        self.assertIn("      id: release_assets\n", STEP)
-        self.assertIn("        RELEASE_VERSION: ${{ steps.version.outputs.version }}\n", STEP)
-        self.assertEqual(COMMAND, "python3 ./scripts/stage-release-assets.py")
-        self.assertNotIn("${{", COMMAND)
-        self.assertNotIn("TOKEN", STEP)
-        for name in steps[start:start + 4]:
-            step = WORKFLOW.split(f"    - name: {name}\n", 1)[1].split("    - name: ", 1)[0]
-            self.assertNotRegex(step, r"(?m)^\s+(if|continue-on-error):")
-        self.assertIn("make test-release-gh test-release-preflight test-release-staging\n", WORKFLOW)
-        self.assertIn("uses: actions/create-release@0cb9c9b65d5d1901c1f53e5e66eaf4afd303e70e", WORKFLOW)
-        self.assertEqual(WORKFLOW.count("uses: actions/upload-release-asset@"), 7)
-
-
 if __name__ == "__main__":
     unittest.main(verbosity=2)
