@@ -6,6 +6,7 @@
 #
 # Verify unauthenticated public downloads before publishing stable.txt.
 # Usage: verify-release.sh VERSION EXPECTED_MANIFEST
+# RELEASE_REPOSITORY selects owner/repository; unset defaults to oracle/coherence-cli.
 set -euo pipefail
 
 if [ "$#" -ne 2 ] || [[ ! "$1" =~ ^[0-9A-Za-z][0-9A-Za-z._-]*$ ]]; then
@@ -13,8 +14,15 @@ if [ "$#" -ne 2 ] || [[ ! "$1" =~ ^[0-9A-Za-z][0-9A-Za-z._-]*$ ]]; then
     exit 1
 fi
 version=$1
+repository=${RELEASE_REPOSITORY-oracle/coherence-cli}
+# Use the same repository format as the release preflight.
+if [[ ! "$repository" =~ ^[A-Za-z0-9-]+/[A-Za-z0-9_.-]+$ ]] ||
+    [[ "${repository#*/}" == "." || "${repository#*/}" == ".." ]]; then
+    echo "Invalid RELEASE_REPOSITORY: expected owner/repository." >&2
+    exit 1
+fi
 manifest="cohctl-${version}-checksums.txt"
-url="https://github.com/oracle/coherence-cli/releases/download/${version}"
+url="https://github.com/${repository}/releases/download/${version}"
 temp=$(mktemp -d)
 trap 'rm -rf -- "${temp}"' EXIT
 cp -- "$2" "${temp}/expected.txt"

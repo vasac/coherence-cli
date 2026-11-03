@@ -204,9 +204,11 @@ jobs:
       shell: bash
       env:
         RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        RELEASE_REPOSITORY: ${{ github.repository }}
       run: ./scripts/verify-release.sh "$RELEASE_VERSION" "cohctl-${RELEASE_VERSION}-checksums.txt"
 
     - name: Release GitHub Pages Stable.txt
+      if: ${{ success() }}
       shell: bash
       run: |
         git config --local user.name "Github Action"
