@@ -471,6 +471,10 @@ test-checksums: ## Test checksum generation and public-release verification
 test-release-gh: ## Test the pinned release GitHub CLI setup without network access
 	python3 ./scripts/test-setup-release-gh.py
 
+.PHONY: test-release-preflight
+test-release-preflight: ## Test the read-only release identity and absence gate
+	python3 ./scripts/test-preflight-release.py
+
 .PHONY: test-install-docs
 test-install-docs: ## Exercise documented Bash and PowerShell procedures
 	python3 ./scripts/test-install-docs.py

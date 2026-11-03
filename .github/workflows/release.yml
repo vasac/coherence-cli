@@ -15,6 +15,11 @@ on:
 permissions:
   contents: write
 
+# Serialize this repository/tag without interrupting a release already in progress.
+concurrency:
+  group: release-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build_release:
     name: build_release
@@ -36,9 +41,9 @@ jobs:
       with:
         go-version-file: 'go.mod'
 
-    - name: Release CLI setup tests
+    - name: Release CLI setup and preflight tests
       shell: bash
-      run: make test-release-gh
+      run: make test-release-gh test-release-preflight
 
     - name: Set up pinned GitHub CLI
       id: release_gh
@@ -93,6 +98,18 @@ jobs:
       env:
         RELEASE_VERSION: ${{ steps.version.outputs.version }}
       run: ./scripts/generate-checksums.sh "$RELEASE_VERSION" ./bin ./build/_output/docs.zip "cohctl-${RELEASE_VERSION}-checksums.txt"
+
+    - name: Validate release identity and absence
+      shell: bash
+      env:
+        RELEASE_GH: ${{ steps.release_gh.outputs.path }}
+        RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        RELEASE_REPOSITORY: ${{ github.repository }}
+        RELEASE_REF: ${{ github.ref }}
+        RELEASE_REF_TYPE: ${{ github.ref_type }}
+        RELEASE_SHA: ${{ github.sha }}
+        GH_TOKEN: ${{ github.token }}
+      run: python3 ./scripts/preflight-release.py
 
     - name: Create Release
       uses: actions/create-release@0cb9c9b65d5d1901c1f53e5e66eaf4afd303e70e # v1.1.4
