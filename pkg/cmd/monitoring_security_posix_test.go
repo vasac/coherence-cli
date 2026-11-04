@@ -9,6 +9,7 @@ package cmd
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -55,17 +56,24 @@ func TestClassifyMonitoringBundleInspectionFailure(t *testing.T) {
 // A subprocess deadline bounds regressions in os.ReadFile on a FIFO with no writer.
 func TestMonitoringRecoveryFIFO(t *testing.T) {
 	if directory := os.Getenv("COHCTL_TEST_MONITORING_RECOVERY_DIR"); directory != "" {
+		// Write directly to stderr so completed phases survive a killed subprocess.
+		fmt.Fprintln(os.Stderr, "monitoring recovery phase: child entered")
 		wantBase := os.Getenv("COHCTL_TEST_MONITORING_RECOVERY_BASE")
 		mon := newMonitoringAt(&cobra.Command{}, directory)
 		switch os.Getenv("COHCTL_TEST_MONITORING_RECOVERY_PROBE") {
 		case "arguments":
+			fmt.Fprintln(os.Stderr, "monitoring recovery phase: arguments probe started")
 			assertMonitoringRecoveryArgs(t, mon, filepath.Join(directory, generatedDockerComposeYAML), defaultMonitoringAddress, false)
+			fmt.Fprintln(os.Stderr, "monitoring recovery phase: arguments probe completed")
 		case "stopped":
 			assertMonitoringRecoveryStopped(t, mon, wantBase)
 		default:
+			fmt.Fprintln(os.Stderr, "monitoring recovery phase: recovery started")
 			assertMonitoringRecovery(t, directory, wantBase, defaultMonitoringAddress, false)
+			fmt.Fprintln(os.Stderr, "monitoring recovery phase: recovery completed")
 			assertMonitoringRecoveryStopped(t, mon, wantBase)
 		}
+		fmt.Fprintln(os.Stderr, "monitoring recovery phase: child completed")
 		return
 	}
 	for _, symlink := range []bool{false, true} {
@@ -143,7 +151,7 @@ func TestMonitoringRecoveryFIFO(t *testing.T) {
 						monitoringBindAddressEnv+"=0.0.0.0", "PATH="+bin)
 					output, err := command.CombinedOutput()
 					if ctx.Err() != nil {
-						t.Fatalf("recovery blocked on %s (subprocess deadline): %v\n%s", kind, ctx.Err(), output)
+						t.Fatalf("recovery subprocess exceeded deadline: %v\n%s", ctx.Err(), output)
 					}
 					if err != nil {
 						t.Fatalf("recovery subprocess failed: %v\n%s", err, output)
@@ -157,7 +165,10 @@ func TestMonitoringRecoveryFIFO(t *testing.T) {
 func assertMonitoringRecoveryStopped(t *testing.T, mon *monitoring, wantBase string) {
 	t.Helper()
 	useDockerComposeParam = false
-	if err := mon.ensureMonitoringIsStopped(); err != nil {
+	fmt.Fprintln(os.Stderr, "monitoring recovery phase: stopped check (no containers) started")
+	err := mon.ensureMonitoringIsStopped()
+	fmt.Fprintln(os.Stderr, "monitoring recovery phase: stopped check (no containers) returned")
+	if err != nil {
 		t.Fatal(err)
 	}
 	// #nosec G703 -- parent test sets this subprocess-only path to its private temporary log.
@@ -173,7 +184,10 @@ func assertMonitoringRecoveryStopped(t *testing.T, mon *monitoring, wantBase str
 		t.Fatalf("unexpected stopped-check command: %q, want %q", args, wantArgs)
 	}
 	t.Setenv("COHCTL_TEST_DOCKER_RUNNING", "1")
-	if err := mon.ensureMonitoringIsStopped(); err == nil || !strings.Contains(err.Error(), "monitoring containers still exist") {
+	fmt.Fprintln(os.Stderr, "monitoring recovery phase: stopped check (containers present) started")
+	err = mon.ensureMonitoringIsStopped()
+	fmt.Fprintln(os.Stderr, "monitoring recovery phase: stopped check (containers present) returned")
+	if err == nil || !strings.Contains(err.Error(), "monitoring containers still exist") {
 		t.Fatalf("expected running monitoring containers to prevent reinitialization, got %v", err)
 	}
 }
