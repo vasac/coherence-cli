@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, 2025 Oracle and/or its affiliates.
+ * Copyright (c) 2021, 2026 Oracle and/or its affiliates.
  * Licensed under the Universal Permissive License v 1.0 as shown at
  * https://oss.oracle.com/licenses/upl.
  */
@@ -923,6 +923,7 @@ func checkOutputFormat() error {
 
 // newWinFileSink returns a Zap.Sink to get around windows issue.
 func newWinFileSink(u *url.URL) (zap.Sink, error) {
+	// #nosec G703 -- initLogging constructs this URL from the user's configuration directory and the fixed cohctl log filename.
 	return os.OpenFile(u.Path[1:], os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
 }
 
