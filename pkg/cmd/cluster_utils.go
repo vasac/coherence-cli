@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, 2025 Oracle and/or its affiliates.
+ * Copyright (c) 2022, 2026 Oracle and/or its affiliates.
  * Licensed under the Universal Permissive License v 1.0 as shown at
  * https://oss.oracle.com/licenses/upl.
  */
@@ -314,6 +314,7 @@ func startCluster(cmd *cobra.Command, connection ClusterConnection, serverCount,
 			input, err1 := os.ReadFile(memberLogFile)
 			if err1 == nil {
 				// original file exists so backup
+				// #nosec G703 -- getLogFile rejects traversal components; the log root is explicitly selected by the local user.
 				err1 = os.WriteFile(backupLogFile, input, 0600)
 				if err1 != nil {
 					return fmt.Errorf("unable to write to log file %s: %v", backupLogFile, err1)
@@ -712,6 +713,11 @@ func runCommandBase(command, logFileName string, arguments []string) (string, er
 }
 
 func getLogFile(clusterName, processName string) (string, error) {
+	for _, name := range []string{clusterName, processName} {
+		if !filepath.IsLocal(name) || name == "." || strings.ContainsAny(name, `/\`) {
+			return "", fmt.Errorf("invalid log path component %q", name)
+		}
+	}
 	clusterLogsDir := filepath.Join(logsDirectory, clusterName)
 	if err := utils.EnsureDirectory(clusterLogsDir); err != nil {
 		return "", err
