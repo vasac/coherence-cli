@@ -994,7 +994,7 @@ func TestClientJavaArgumentPreservation(t *testing.T) {
 }
 
 func TestClientServerArgumentPersistence(t *testing.T) {
-	for _, format := range []string{configType, "yml", constants.JSON} {
+	for _, format := range []string{configType, ordinaryYML, constants.JSON} {
 		t.Run(format, func(t *testing.T) {
 			managedPersistenceState(t)
 			filename := filepath.Join(t.TempDir(), "cohctl."+format)
@@ -1188,7 +1188,7 @@ func TestManagementLauncherCapability(t *testing.T) {
 }
 
 func TestManagementLauncherPreflightBeforeStop(t *testing.T) {
-	for _, value := range []string{"-Dcoherence.management.http.address=0.0.0.0", "com.tangosol.net.Coherence", "--source=17", managementTestArgfile} {
+	for _, value := range []string{"-Dcoherence.management.http.address=0.0.0.0", connectionTestStartupClass, "--source=17", managementTestArgfile} {
 		t.Run(value, func(t *testing.T) {
 			managedTestState(t)
 			calls := 0
@@ -1253,7 +1253,7 @@ func TestManagementArgumentAssembly(t *testing.T) {
 			connection := ClusterConnection{Name: "capture", ManuallyCreated: true, ManagementPort: 30000, ClusterVersion: managementTestJava11Coherence, BaseClasspath: "base classes", Arguments: `-cp "saved classes" -Dcustom="saved value"`, StartupClass: "com.tangosol.net.DefaultCacheServer", Management: &ClusterManagement{RESTAddress: localHost}}
 			wantMain := connection.StartupClass
 			if firstOnly {
-				serverStartClassParam = "com.tangosol.net.Coherence"
+				serverStartClassParam = connectionTestStartupClass
 				wantMain = serverStartClassParam
 			}
 			management := ClusterManagement{RESTAddress: localHost, JMXAddress: localHost, JMXHost: localHost, JMXPort: 30001}
