@@ -162,7 +162,7 @@ func TestConfigurationWriterFirstUseSelection(t *testing.T) {
 func TestManagementPersistenceSelectedFormat(t *testing.T) {
 	for _, tc := range []struct{ name, filename, format, explicitType string }{
 		{configType, "cohctl.yaml", configType, ""},
-		{"yml", "cohctl.yml", configType, ""},
+		{ordinaryYML, "cohctl.yml", configType, ""},
 		{managementTestJSON, "cohctl.json", managementTestJSON, ""},
 		{"explicit-extensionless", "cohctl", managementTestJSON, managementTestJSON},
 		{"explicit-json-over-extension", "cohctl.yaml", managementTestJSON, managementTestJSON},
@@ -362,12 +362,12 @@ func TestManagementPersistenceSelectedFileRemoved(t *testing.T) {
 }
 
 func TestManagementPersistenceOtherFormats(t *testing.T) {
-	for _, format := range []string{"toml", "env", "dotenv"} {
+	for _, format := range []string{ordinaryTOML, "env", "dotenv"} {
 		t.Run(format, func(t *testing.T) {
 			managedPersistenceState(t)
 			filename := filepath.Join(t.TempDir(), "cohctl."+format)
 			data := "OWNER=original\n"
-			if format == "toml" {
+			if format == ordinaryTOML {
 				data = "owner = 'original'\n"
 			}
 			if err := os.WriteFile(filename, []byte(data), 0600); err != nil {
@@ -627,10 +627,10 @@ const (
 // It has no transient decode exclusion and therefore must round trip too.
 func ordinaryPersistenceConnection(name string, management *ClusterManagement) ClusterConnection {
 	return ClusterConnection{
-		Name: name, DiscoveryType: "nslookup", ConnectionType: httpType,
+		Name: name, DiscoveryType: nameServiceDiscoveryType, ConnectionType: httpType,
 		ConnectionURL:        "https://" + name + ".example/management/coherence/cluster",
 		NameServiceDiscovery: "discovery.example:7574", ClusterVersion: "14.1.2-0-5",
-		ClusterName: "cluster-" + name, ClusterType: "Standalone", ManuallyCreated: true,
+		ClusterName: "cluster-" + name, ClusterType: connectionTestStandalone, ManuallyCreated: true,
 		BaseClasspath: "/base/coherence.jar", AdditionalClasspath: "/extra classes/custom.jar",
 		Arguments:      `  -Dlegacy=it's -Djson={"mode":"safe"}  -Dpath=C:\cache\file `,
 		ManagementPort: 30000, PersistenceMode: "active", LoggingDestination: "/logs with spaces",
@@ -951,10 +951,10 @@ func TestOrdinaryConfigCallerOperations(t *testing.T) {
 			check()
 			cmd := managementTestCommand(t)
 			url := server.URL + "/management/coherence/cluster"
-			if err := addCluster(cmd, "caller-added", url, "nslookup", "ns.example:7574"); err != nil {
+			if err := addCluster(cmd, "caller-added", url, nameServiceDiscoveryType, "ns.example:7574", false); err != nil {
 				t.Fatal(err)
 			}
-			added := ClusterConnection{Name: "caller-added", ConnectionType: httpType, ConnectionURL: url, DiscoveryType: "nslookup", ClusterVersion: "15.1.1-0-6", ClusterName: "caller-cluster", ClusterType: "Standalone", NameServiceDiscovery: "ns.example:7574"}
+			added := ClusterConnection{Name: "caller-added", ConnectionType: httpType, ConnectionURL: url, DiscoveryType: nameServiceDiscoveryType, ClusterVersion: "15.1.1-0-6", ClusterName: "caller-cluster", ClusterType: connectionTestStandalone, NameServiceDiscovery: "ns.example:7574"}
 			want.Clusters = append(want.Clusters, added)
 			check()
 			if err := setContext(cmd, added.Name); err != nil {

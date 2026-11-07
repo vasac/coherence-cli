@@ -56,10 +56,15 @@ var addClusterCmd = &cobra.Command{
 	Long: `The 'add cluster' command adds a new connection to a Coherence cluster. You can
 specify the full url such as https://<host>:<management-port>/management/coherence/cluster.
 You can also specify host:port (for http connections) and the url will be automatically
-populated constructed.`,
-	Args: func(cmd *cobra.Command, args []string) error {
+constructed. Use --ignore-certs only to allow invalid certificates for this
+saved HTTPS connection's origin, including the initial probe. Verification is enabled
+by default. Prefer a valid matching certificate and COHERENCE_TLS_CERTS_PATH for
+private CA trust. Trusting a CA cannot fix expiry or a hostname mismatch.
+Downloads, discovery and other-origin destinations remain verified. The exception
+warns on stderr before its first use per connection/origin in each execution.`,
+	Args: func(_ *cobra.Command, args []string) error {
 		if len(args) != 1 {
-			displayErrorAndExit(cmd, youMustProviderConnectionMessage)
+			return errors.New(youMustProviderConnectionMessage)
 		}
 		return nil
 	},
@@ -75,7 +80,14 @@ populated constructed.`,
 			return errors.New("you must provide a connection url")
 		}
 
-		if err = addCluster(cmd, connection, connectionURL, "manual", ""); err != nil {
+		ignoreInvalidCerts, err := cmd.Flags().GetBool("ignore-certs")
+		if err != nil {
+			return err
+		}
+		if cmd.Flags().Changed("ignore-certs") && !fetcher.IsValidHTTPSURL(connectionURL) {
+			return errors.New("--ignore-certs requires a valid HTTPS connection URL")
+		}
+		if err = addCluster(cmd, connection, connectionURL, "manual", "", ignoreInvalidCerts); err != nil {
 			return err
 		}
 
@@ -656,7 +668,7 @@ you can confirm if you wish to add the discovered clusters.`,
 		for _, cluster := range discoveredClusters {
 			if cluster.SelectedURL != "" {
 				nsAddress := fmt.Sprintf("%s:%d", cluster.Host, cluster.NSPort)
-				err = addCluster(cmd, cluster.ConnectionName, cluster.SelectedURL, "nslookup", nsAddress)
+				err = addCluster(cmd, cluster.ConnectionName, cluster.SelectedURL, "nslookup", nsAddress, false)
 				err = logErrorAndCheck(cmd, "unable to discover cluster "+cluster.ConnectionName, err)
 				if err != nil {
 					return err
@@ -677,7 +689,10 @@ you can confirm if you wish to add the discovered clusters.`,
 }
 
 // addCluster adds a new cluster.
-func addCluster(cmd *cobra.Command, connection, connectionURL, discoveryType, nsAddress string) error {
+func addCluster(cmd *cobra.Command, connection, connectionURL, discoveryType, nsAddress string, ignoreInvalidCerts bool) error {
+	if ignoreInvalidCerts && !fetcher.IsValidHTTPSURL(connectionURL) {
+		return errors.New("--ignore-certs requires a valid HTTPS connection URL")
+	}
 	// check to see if the url is just host:port and then build the full management URL using http as default
 	// otherwise let it fall through and get validated
 	if !strings.Contains(connectionURL, httpType) {
@@ -692,7 +707,7 @@ func addCluster(cmd *cobra.Command, connection, connectionURL, discoveryType, ns
 
 	isWebLogic := fetcher.IsWebLogicServer(connectionURL)
 
-	dataFetcher, err := fetcher.GetFetcherOrError(connectionType, connectionURL, Username, "")
+	dataFetcher, err := fetcher.GetFetcherForConnection(connectionType, connectionURL, Username, "", connection, ignoreInvalidCerts)
 	if err != nil {
 		return err
 	}
@@ -720,16 +735,29 @@ func addCluster(cmd *cobra.Command, connection, connectionURL, discoveryType, ns
 	newCluster := ClusterConnection{Name: connection, ConnectionType: connectionType, ConnectionURL: connectionURL,
 		DiscoveryType: discoveryType, ClusterVersion: cluster.Version, ClusterName: cluster.ClusterName,
 		ClusterType: clusterType, NameServiceDiscovery: nsAddress}
+	if fetcher.IsValidHTTPSURL(connectionURL) {
+		newCluster.IgnoreInvalidCerts = &ignoreInvalidCerts
+	}
 
-	Config.Clusters = append(Config.Clusters, newCluster)
-
-	viper.Set(clusterKey, Config.Clusters)
-	err = WriteConfig()
-	if err != nil {
+	connections := append(append([]ClusterConnection(nil), Config.Clusters...), newCluster)
+	if err = saveClusterConnections(connections); err != nil {
 		return err
 	}
 
 	cmd.Printf("Added cluster %s with type %s and URL %s\n", connection, connectionType, connectionURL)
+	return nil
+}
+
+// Publish live changes only after persistence succeeds; a failed write must not
+// leave a connection or exception available to a subsequent command.
+func saveClusterConnections(connections []ClusterConnection) error {
+	previous := viper.Get(clusterKey)
+	viper.Set(clusterKey, connections)
+	if err := WriteConfig(); err != nil {
+		viper.Set(clusterKey, previous)
+		return err
+	}
+	Config.Clusters = connections
 	return nil
 }
 
@@ -1428,6 +1456,7 @@ func init() {
 	addClusterCmd.Flags().StringVarP(&connectionURL, "url", "u", "", "connection URL")
 	_ = addClusterCmd.MarkFlagRequired("url")
 	addClusterCmd.Flags().StringVarP(&connectionType, "type", "t", httpType, "connection type, http")
+	addClusterCmd.Flags().Bool("ignore-certs", false, "allow invalid certificates only for this saved HTTPS connection")
 
 	describeClusterCmd.Flags().BoolVarP(&verboseOutput, "verbose", "v", false,
 		"include verbose output including individual members, reporters and executor details")
