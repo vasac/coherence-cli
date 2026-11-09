@@ -33,9 +33,11 @@ import (
 const (
 	persistenceRenamePhase = "rename"
 
-	persistenceWritePhase = "write"
-	persistenceSyncPhase  = "sync"
-	persistenceClosePhase = "close"
+	persistenceWritePhase     = "write"
+	persistenceSyncPhase      = "sync"
+	persistenceClosePhase     = "close"
+	persistenceDanglingPhase  = "dangling-link"
+	persistenceDirectoryPhase = "directory-target"
 )
 
 func managedPersistenceState(t *testing.T) {
@@ -220,6 +222,141 @@ func TestManagementPersistenceSelectedFormat(t *testing.T) {
 	}
 }
 
+func TestManagementPersistencePreservesSelectedSymlink(t *testing.T) {
+	if runtime.GOOS == managementTestWindows {
+		t.Skip("Unix symlink replacement regression")
+	}
+	for _, tc := range []struct {
+		name, format string
+		relative     bool
+	}{
+		{"relative-yaml", configType, true},
+		{"absolute-json", managementTestJSON, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			managedPersistenceState(t)
+			root := t.TempDir()
+			filename := filepath.Join(root, "selected", "cohctl."+tc.format)
+			// The selected filename supplies the format, even when the target
+			// has a different extension and lives in another directory.
+			target := filepath.Join(root, "targets", "settings.data")
+			for _, path := range []string{filename, target} {
+				if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			linkTarget := target
+			if tc.relative {
+				var err error
+				linkTarget, err = filepath.Rel(filepath.Dir(filename), target)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := os.Symlink(linkTarget, filename); err != nil {
+				t.Fatal(err)
+			}
+			external := persistenceFixture(t, filename, tc.format, "")
+			if viper.ConfigFileUsed() != filename {
+				t.Fatal("fixture did not select the symlink")
+			}
+			connection := managedConnection(ClusterConnection{Name: managementTestConnectionName, ClusterName: managementTestConnectionName,
+				ManuallyCreated: true, ManagementPort: 30000}, ClusterManagement{managementTestIP, 9999, localHost, loopbackHostname})
+			if err := persistManagedConnection(connection, true); err != nil {
+				t.Fatal(err)
+			}
+			info, err := os.Lstat(filename)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if info.Mode()&os.ModeSymlink == 0 {
+				t.Errorf("selected configuration symlink was replaced: mode %v", info.Mode())
+			} else if got, err := os.Readlink(filename); err != nil || got != linkTarget {
+				t.Errorf("selected configuration symlink target: got %q (%v), want %q", got, err, linkTarget)
+			}
+			_, loaded := readManagedPersistence(t, target, tc.format)
+			if !reflect.DeepEqual(loaded.Clusters, []ClusterConnection{external, connection}) || loaded.CurrentContext != connection.Name {
+				t.Errorf("symlink target did not receive saved management settings %+v and URL %q; got %+v", *connection.Management, connection.ConnectionURL, loaded)
+			}
+			assertNoManagedReplacement(t, filename)
+			assertNoManagedReplacement(t, target)
+		})
+	}
+}
+
+func TestManagementPersistenceSymlinkChain(t *testing.T) {
+	if runtime.GOOS == managementTestWindows {
+		t.Skip("Unix symlink persistence")
+	}
+	managedPersistenceState(t)
+	root := t.TempDir()
+	filename := filepath.Join(root, "selected", "cohctl.yaml")
+	hop := filepath.Join(root, "links", "hop")
+	target := filepath.Join(root, "targets", "settings.data")
+	for _, path := range []string{filename, hop, target} {
+		if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	links := map[string]string{filename: "../links/hop", hop: "../targets/settings.data"}
+	for path, text := range links {
+		if err := os.Symlink(text, path); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// An explicit type still overrides the selected extension through a chain.
+	persistenceFixture(t, filename, managementTestJSON, managementTestJSON)
+	createManagedConfigTemp = func(dir, pattern string) (managedConfigFile, error) {
+		if dir != filepath.Dir(target) {
+			t.Fatalf("replacement directory: got %q, want %q", dir, filepath.Dir(target))
+		}
+		return os.CreateTemp(dir, pattern)
+	}
+	renameManagedConfig = func(from, to string) error {
+		if to != target || filepath.Dir(from) != filepath.Dir(target) {
+			t.Fatalf("replacement must be beside resolved target: %q -> %q", from, to)
+		}
+		return os.Rename(from, to)
+	}
+	connection := managedConnection(ClusterConnection{Name: managementTestConnectionName, ManuallyCreated: true, ManagementPort: 30000}, ClusterManagement{RESTAddress: managementTestIP})
+	if err := persistManagedConnection(connection, true); err != nil {
+		t.Fatal(err)
+	}
+	_, loaded := readManagedPersistence(t, target, managementTestJSON)
+	if !reflect.DeepEqual(loaded, Config) || loaded.CurrentContext != connection.Name || viper.ConfigFileUsed() != filename {
+		t.Fatalf("chain save changed selected path or configuration: %+v", loaded)
+	}
+	for path, text := range links {
+		if got, err := os.Readlink(path); err != nil || got != text {
+			t.Fatalf("chain link changed: %q -> %q (%v), want %q", path, got, err, text)
+		}
+		assertNoManagedReplacement(t, path)
+	}
+	info, err := os.Stat(target)
+	if err != nil || info.Mode().Perm() != 0600 {
+		t.Fatalf("replacement permissions: %v (%v)", info, err)
+	}
+	assertNoManagedReplacement(t, target)
+}
+
+func TestManagementPersistenceSelectedFileRemoved(t *testing.T) {
+	managedPersistenceState(t)
+	filename := filepath.Join(t.TempDir(), "cohctl.json")
+	persistenceFixture(t, filename, managementTestJSON, "")
+	if err := os.Remove(filename); err != nil {
+		t.Fatal(err)
+	}
+	connection := managedConnection(ClusterConnection{Name: managementTestConnectionName, ManuallyCreated: true, ManagementPort: 30000}, ClusterManagement{RESTAddress: localHost})
+	if err := persistManagedConnection(connection, true); err != nil {
+		t.Fatal(err)
+	}
+	_, loaded := readManagedPersistence(t, filename, managementTestJSON)
+	if !reflect.DeepEqual(loaded, Config) || loaded.CurrentContext != connection.Name || viper.ConfigFileUsed() != filename {
+		t.Fatalf("removed selected file did not retain ordinary save behavior: %+v", loaded)
+	}
+	assertNoManagedReplacement(t, filename)
+}
+
 func TestManagementPersistenceOtherFormats(t *testing.T) {
 	for _, format := range []string{"toml", "env", "dotenv"} {
 		t.Run(format, func(t *testing.T) {
@@ -351,6 +488,109 @@ func TestManagementPersistenceFailureRollback(t *testing.T) {
 				readManagedPersistence(t, filename, managementTestJSON)
 			})
 		}
+	}
+}
+
+func TestManagementPersistenceSymlinkFailureRollback(t *testing.T) {
+	if runtime.GOOS == managementTestWindows {
+		t.Skip("Unix symlink persistence")
+	}
+	for _, phase := range []string{persistenceDanglingPhase, "link-cycle", "non-directory", persistenceDirectoryPhase, ordinarySerializePhase, ordinaryCodecPhase, managementTestCreate, persistenceWritePhase, persistenceSyncPhase, persistenceClosePhase, persistenceRenamePhase} {
+		t.Run(phase, func(t *testing.T) {
+			managedPersistenceState(t)
+			root := t.TempDir()
+			filename := filepath.Join(root, "selected", "cohctl.json")
+			target := filepath.Join(root, "targets", "settings.data")
+			for _, path := range []string{filename, target} {
+				if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			linkTarget := "../targets/settings.data"
+			if err := os.Symlink(linkTarget, filename); err != nil {
+				t.Fatal(err)
+			}
+			persistenceFixture(t, filename, managementTestJSON, "")
+			sentinel := errors.New("injected " + phase + " failure")
+			var replacement *os.File
+			createCalled := false
+			createManagedConfigTemp = func(dir, pattern string) (managedConfigFile, error) {
+				createCalled = true
+				var err error
+				replacement, err = os.CreateTemp(dir, pattern)
+				if err != nil {
+					return nil, err
+				}
+				return &failingManagedConfigFile{replacement, phase, sentinel}, nil
+			}
+			resolutionFailure := false
+			switch phase {
+			case persistenceDanglingPhase:
+				linkTarget = "../targets/missing"
+				resolutionFailure = true
+			case "link-cycle":
+				linkTarget = filepath.Base(filename)
+				resolutionFailure = true
+			case "non-directory":
+				linkTarget += "/child"
+				resolutionFailure = true
+			case persistenceDirectoryPhase:
+				linkTarget = "../targets"
+			case ordinarySerializePhase:
+				viper.Set("unserializable", make(chan int))
+			case ordinaryCodecPhase:
+				viper.SetConfigType("ini")
+			case managementTestCreate:
+				createManagedConfigTemp = func(dir, pattern string) (managedConfigFile, error) {
+					return os.CreateTemp(filepath.Join(dir, "missing"), pattern)
+				}
+			case persistenceRenamePhase:
+				renameManagedConfig = func(_, _ string) error { return sentinel }
+			}
+			if err := os.Remove(filename); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink(linkTarget, filename); err != nil {
+				t.Fatal(err)
+			}
+			before, err := os.ReadFile(target)
+			if err != nil {
+				t.Fatal(err)
+			}
+			oldConfig, oldSettings := Config, viper.AllSettings()
+			connection := managedConnection(ClusterConnection{Name: managementTestConnectionName, ManuallyCreated: true, ManagementPort: 30000}, ClusterManagement{RESTAddress: managementTestIP})
+			err = persistManagedConnection(connection, true)
+			if err == nil || !strings.Contains(err.Error(), "previous configuration retained") {
+				t.Fatalf("failure ignored: %v", err)
+			}
+			if resolutionFailure && (createCalled || !strings.Contains(err.Error(), "unable to resolve configuration symlink")) {
+				t.Fatalf("unresolved link reached replacement creation: %v", err)
+			}
+			if phase == persistenceDanglingPhase && !errors.Is(err, os.ErrNotExist) {
+				t.Fatalf("lost resolution failure: %v", err)
+			}
+			if (phase == persistenceSyncPhase || phase == persistenceClosePhase || phase == persistenceRenamePhase) && !errors.Is(err, sentinel) {
+				t.Fatalf("lost failure: %v", err)
+			}
+			if phase == persistenceWritePhase && !strings.Contains(err.Error(), sentinel.Error()) {
+				t.Fatalf("lost Viper write failure: %v", err)
+			}
+			after, err := os.ReadFile(target)
+			if err != nil || !bytes.Equal(before, after) || !reflect.DeepEqual(Config, oldConfig) || !reflect.DeepEqual(viper.AllSettings(), oldSettings) || viper.ConfigFileUsed() != filename {
+				t.Fatalf("failure changed prior state: %v", err)
+			}
+			if got, err := os.Readlink(filename); err != nil || got != linkTarget {
+				t.Fatalf("failure changed selected link: got %q (%v), want %q", got, err, linkTarget)
+			}
+			if replacement != nil {
+				if _, err := replacement.Write([]byte("handle must be closed")); !errors.Is(err, os.ErrClosed) {
+					t.Fatalf("replacement handle retained: %v", err)
+				}
+			}
+			assertNoManagedReplacement(t, filename)
+			assertNoManagedReplacement(t, target)
+			assertNoManagedReplacement(t, filepath.Dir(target))
+		})
 	}
 }
 
