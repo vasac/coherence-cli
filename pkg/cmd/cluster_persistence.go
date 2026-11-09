@@ -7,6 +7,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -31,14 +32,25 @@ var createManagedConfigTemp = func(dir, pattern string) (managedConfigFile, erro
 
 var renameManagedConfig = os.Rename
 
-// Write a complete replacement beside the config and rename only after success.
+// Write a complete replacement beside the destination and rename only after success.
 // A failed serialization/write must leave the prior on-disk settings intact.
 func writeManagedConfigAtomically() error {
 	filename := viper.ConfigFileUsed()
 	if filename == "" {
 		return fmt.Errorf("no configuration file selected")
 	}
-	f, err := createManagedConfigTemp(filepath.Dir(filename), ".cohctl-management-*")
+	destination := filename
+	info, err := os.Lstat(filename)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	if err == nil && info.Mode()&os.ModeSymlink != 0 {
+		destination, err = filepath.EvalSymlinks(filename)
+		if err != nil {
+			return fmt.Errorf("unable to resolve configuration symlink %s: %w", filename, err)
+		}
+	}
+	f, err := createManagedConfigTemp(filepath.Dir(destination), ".cohctl-management-*")
 	if err != nil {
 		return err
 	}
@@ -56,7 +68,7 @@ func writeManagedConfigAtomically() error {
 	if err = f.Close(); err != nil {
 		return err
 	}
-	return renameManagedConfig(name, filename)
+	return renameManagedConfig(name, destination)
 }
 
 var writeManagedConfig = writeManagedConfigAtomically
