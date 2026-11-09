@@ -32,6 +32,33 @@ import shlex
 import f1_platform as native
 
 
+def wait_for_rest_membership(expected, endpoints, read_members, timeout=30, poll_interval=.1):
+    """Wait for every selected endpoint under one deadline; retain exact identities."""
+    deadline = time.monotonic() + timeout
+    last = {member: {"port": port, "members": None} for member, port in endpoints.items()}
+    while time.monotonic() < deadline:
+        complete = True
+        for member, port in endpoints.items():
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                complete = False
+                break
+            try:
+                observed = read_members(port, timeout=min(3, remaining))
+                last[member] = {"port": port, "members": observed}
+                complete = complete and observed == expected
+            except (OSError, ValueError) as error:
+                last[member] = {"port": port, "members": last[member]["members"], "error": repr(error)}
+                complete = False
+        if complete and time.monotonic() <= deadline:
+            return last
+        remaining = deadline - time.monotonic()
+        if remaining > 0:
+            time.sleep(min(poll_interval, remaining))
+    raise TimeoutError(f"REST membership did not converge within {timeout}s: " +
+                       json.dumps({"expected": expected, "endpoints": last}, sort_keys=True))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("version")
@@ -163,8 +190,8 @@ def main():
                 raise AssertionError(result.stdout)
             return result.stdout
 
-        def members(port=http):
-            with opener.open(f"http://{local_host}:{port}/management/coherence/cluster/members", timeout=3) as response:
+        def members(port=http, timeout=3):
+            with opener.open(f"http://{local_host}:{port}/management/coherence/cluster/members", timeout=timeout) as response:
                 items = json.load(response)["items"]
             result = {item["memberName"]: int(item["processName"]) for item in items}
             assert len(result) == len(items) and len(set(result.values())) == len(items), "ambiguous member/PID identities"
@@ -181,14 +208,19 @@ def main():
 
         def inspect(label, expected_http, with_jmx, bind_address="127.0.0.1"):
             remote = bind_address != "127.0.0.1"
-            current = members()
-            assert set(current.values()) == marked_processes(), "REST snapshot differs from current test-owned processes"
-            snapshots, rest, rest_identity = [], {}, {}
-            for member, pid in current.items():
+            current, snapshots, rest, rest_identity = {}, [], {}, {}
+            # REST can accept requests before its membership view has converged.
+            # Obtain expected identities from the marked JVMs rather than an
+            # arbitrarily early REST response, including from the primary.
+            for pid in native.processes(marker):
                 snapshot = native.snapshot(pid)
                 process_args = snapshot["command"]
-                assert f"-Dcoherence.cluster={marker}" in process_args.split(), "cluster PID identity mismatch"
-                assert f"-Dcoherence.member={member}" in process_args.split(), "member PID identity mismatch"
+                tokens = [word.strip('"') for word in shlex.split(process_args, posix=os.name != "nt")]
+                assert f"-Dcoherence.cluster={marker}" in tokens, "cluster PID identity mismatch"
+                names = [word.removeprefix("-Dcoherence.member=") for word in tokens if word.startswith("-Dcoherence.member=")]
+                assert len(names) == 1 and names[0] and names[0] not in current, "member PID identity mismatch"
+                member = names[0]
+                current[member] = pid
                 addresses = snapshot["listeners"]
                 snapshot["member"] = member
                 snapshots.append(snapshot)
@@ -196,7 +228,6 @@ def main():
                 if state:
                     with observer_lock:
                         linux_identities.setdefault(f"{pid}:{state['start_ticks']}", state)
-                tokens = [word.strip('"') for word in shlex.split(process_args, posix=os.name != "nt")]
                 classpath = tokens[tokens.index("-cp") + 1]
                 snapshot["classpath"] = [{"path": item, "sha256": hashlib.sha256(Path(item).read_bytes()).hexdigest()}
                                          for item in classpath.split(os.pathsep)]
@@ -215,14 +246,25 @@ def main():
                         continue
                     if data.get("clusterName") != marker:
                         continue
-                    native.assert_listener_bind(addresses, port, bind_address)
-                    observed = members(port)
-                    assert observed == current, ("REST endpoint member/PID identity mismatch", member, port, observed, current)
-                    assert connect(interface, port) == remote, ("unexpected interface REST reachability", port)
                     assert member not in rest, ("multiple Management REST listeners on one member", member)
                     rest[member] = port
-                    rest_identity[member] = {"owner_pid": pid, "cluster_name": data["clusterName"], "members": observed}
+                    rest_identity[member] = {"owner_pid": pid, "cluster_name": data["clusterName"]}
+            assert current and set(current.values()) == marked_processes(), "REST snapshot differs from current test-owned processes"
             assert len(rest) == expected_http, (label, "REST listener count", rest, snapshots)
+            wait_for_rest_membership(current, rest, members)
+            for snapshot in snapshots:
+                fresh = native.snapshot(snapshot["pid"])
+                assert fresh["command"] == snapshot["command"] and fresh.get("started") == snapshot.get("started"), "member process changed during REST readiness"
+                snapshot.update(fresh)
+                member = snapshot["member"]
+                if member not in rest:
+                    continue
+                port = rest[member]
+                native.assert_listener_bind(snapshot["listeners"], port, bind_address)
+                observed = members(port)
+                assert observed == current, ("REST endpoint member/PID identity mismatch", member, port, observed, current)
+                assert connect(interface, port) == remote, ("unexpected interface REST reachability", port)
+                rest_identity[member]["members"] = observed
             if with_jmx:
                 owner = current["storage-0"]
                 sockets = [s for s in snapshots if any(a.rsplit(":", 1)[-1] == str(jmx) for a in s["listeners"])]
