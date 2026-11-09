@@ -7,10 +7,13 @@
 package main
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+	"runtime"
+	"slices"
 	"strings"
 )
 
@@ -27,10 +30,13 @@ type acceptedIssue struct {
 }
 
 type baseline struct {
-	Version     int             `json:"version"`
-	ToolVersion string          `json:"tool_version"`
-	Review      string          `json:"review"`
-	Issues      []acceptedIssue `json:"issues"`
+	Version      int             `json:"version"`
+	ToolVersion  string          `json:"tool_version"`
+	GoVersion    string          `json:"go_version"`
+	ConfigSHA256 string          `json:"config_sha256"`
+	Platforms    []string        `json:"platforms"`
+	Review       string          `json:"review"`
+	Issues       []acceptedIssue `json:"issues"`
 }
 
 type issue struct {
@@ -49,9 +55,11 @@ func (s signature) key() string {
 	return string(encoded)
 }
 
-func validateBaseline(b baseline, version string) error {
-	if b.Version != 1 || b.ToolVersion != version || b.Review == "" {
-		return fmt.Errorf("lint baseline metadata does not match tool %s; review before updating", version)
+func validateBaseline(b baseline, version, platform string, config []byte) error {
+	if b.Version != 1 || b.ToolVersion != version || b.GoVersion != runtime.Version() ||
+		b.ConfigSHA256 != fmt.Sprintf("%x", sha256.Sum256(config)) ||
+		!slices.Contains(b.Platforms, platform) || strings.TrimSpace(b.Review) == "" || b.Issues == nil {
+		return fmt.Errorf("lint baseline metadata does not match tool %s, Go %s, config or platform %s; review before updating", version, runtime.Version(), platform)
 	}
 	for _, accepted := range b.Issues {
 		allowed := accepted.Linter == "goconst"
@@ -69,7 +77,7 @@ func validateBaseline(b baseline, version string) error {
 				allowed = true
 			}
 		}
-		if !allowed || accepted.Path == "" || accepted.Text == "" || len(accepted.Source) == 0 || accepted.Reason == "" {
+		if !allowed || accepted.Path == "" || accepted.Text == "" || len(accepted.Source) == 0 || strings.TrimSpace(accepted.Reason) == "" {
 			return fmt.Errorf("invalid or non-style baseline entry: %s %s", accepted.Linter, accepted.Path)
 		}
 	}
@@ -97,40 +105,52 @@ func unexpectedIssues(issues []issue, accepted []acceptedIssue) ([]issue, int) {
 	return unexpected, stale
 }
 
-func checkReport(reportPath, baselinePath, version string) error {
-	// These paths are explicit local inputs supplied by the make recipe.
-	// #nosec G703 -- read the build-generated tool report, not a path received from a remote service.
-	reportData, err := os.ReadFile(reportPath)
-	if err != nil {
+func checkReport(input io.Reader, baselineData, config []byte, version, platform string) error {
+	var report map[string]json.RawMessage
+	reportDecoder := json.NewDecoder(input)
+	if err := reportDecoder.Decode(&report); err != nil {
 		return err
 	}
-	var report map[string]json.RawMessage
-	if err = json.Unmarshal(reportData, &report); err != nil {
-		return err
+	if err := reportDecoder.Decode(&struct{}{}); err != io.EOF {
+		return fmt.Errorf("lint report must contain exactly one JSON object")
 	}
 	rawIssues, exists := report["Issues"]
-	if !exists {
-		return fmt.Errorf("lint report has no Issues field")
+	if !exists || report["Report"] == nil {
+		return fmt.Errorf("lint report has no Issues or Report field")
 	}
 	var issues []issue
-	if err = json.Unmarshal(rawIssues, &issues); err != nil {
+	if err := json.Unmarshal(rawIssues, &issues); err != nil {
 		return err
 	}
-	// #nosec G703 -- read the explicitly selected, repository-reviewed baseline file.
-	baselineData, err := os.ReadFile(baselinePath)
-	if err != nil {
-		return err
+	var metadata struct {
+		Linters []struct {
+			Name    string
+			Enabled bool
+		}
+	}
+	if err := json.Unmarshal(report["Report"], &metadata); err != nil || len(metadata.Linters) == 0 {
+		return fmt.Errorf("lint report has invalid linter metadata")
+	}
+	var enabled []string
+	for _, linter := range metadata.Linters {
+		if linter.Enabled {
+			enabled = append(enabled, linter.Name)
+		}
+	}
+	slices.Sort(enabled)
+	if strings.Join(enabled, ",") != "errcheck,errname,goconst,gofmt,gosec,govet,ineffassign,revive,staticcheck,typecheck,unused" {
+		return fmt.Errorf("lint report enabled linters do not match the reviewed configuration")
 	}
 	var b baseline
 	decoder := json.NewDecoder(strings.NewReader(string(baselineData)))
 	decoder.DisallowUnknownFields()
-	if err = decoder.Decode(&b); err != nil {
+	if err := decoder.Decode(&b); err != nil {
 		return err
 	}
-	if err = decoder.Decode(&struct{}{}); err != io.EOF {
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
 		return fmt.Errorf("lint baseline must contain exactly one JSON object")
 	}
-	if err = validateBaseline(b, version); err != nil {
+	if err := validateBaseline(b, version, platform, config); err != nil {
 		return err
 	}
 	unexpected, stale := unexpectedIssues(issues, b.Issues)
@@ -144,12 +164,27 @@ func checkReport(reportPath, baselinePath, version string) error {
 	return nil
 }
 
-func main() {
-	if len(os.Args) != 4 {
-		fmt.Fprintln(os.Stderr, "usage: lintbaseline REPORT BASELINE TOOL_VERSION")
-		os.Exit(2)
+func run() error {
+	if len(os.Args) != 3 {
+		return fmt.Errorf("usage: lintbaseline TOOL_VERSION GOOS/GOARCH < REPORT (CGO_ENABLED=0)")
 	}
-	if err := checkReport(os.Args[1], os.Args[2], os.Args[3]); err != nil {
+	if os.Getenv("CGO_ENABLED") != "0" {
+		return fmt.Errorf("lint baseline requires CGO_ENABLED=0")
+	}
+	// Fixed repository inputs and stdin avoid accepting CLI-controlled file paths.
+	baselineData, err := os.ReadFile(".golangci-baseline.json")
+	if err != nil {
+		return err
+	}
+	config, err := os.ReadFile(".golangci.yaml")
+	if err != nil {
+		return err
+	}
+	return checkReport(os.Stdin, baselineData, config, os.Args[1], os.Args[2])
+}
+
+func main() {
+	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
