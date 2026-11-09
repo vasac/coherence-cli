@@ -103,7 +103,7 @@ func TestMonitoringConfigBaseURL(t *testing.T) {
 }
 
 func TestValidateMonitoringSecretPermissions(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == managementTestWindows {
 		t.Skip("POSIX permissions are not meaningful on Windows")
 	}
 	file := filepath.Join(t.TempDir(), grafanaPasswordFile)
@@ -841,7 +841,7 @@ func TestGeneratedGrafanaRuntimeCannotBypassSecretDelivery(t *testing.T) {
 }
 
 func TestGrafanaCredentialEntrypoint(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == managementTestWindows {
 		t.Skip("Linux container shell is exercised by the Docker tests")
 	}
 	password := strings.Repeat("a", 43)
