@@ -72,8 +72,6 @@ TOOLS_DIRECTORY   = $(CURRDIR)/build/tools
 TOOLS_BIN         = $(TOOLS_DIRECTORY)/bin
 GOLANGCI_LINT_VERSION := 2.15.0
 GOLANGCI_LINT = $(TOOLS_BIN)/golangci-lint
-# Exact reviewed style findings only; see the linked review before changing this.
-GOLANGCI_LINT_BASELINE := .golangci-baseline.json
 
 # ----------------------------------------------------------------------------------------------------------------------
 # The test application images used in integration tests
@@ -396,14 +394,15 @@ copyright: getcopyright ## Check copyright headers
 golangci: golangci-lint ## Check formatting and all linters against reviewed style debt
 	"$(GOLANGCI_LINT)" fmt --diff --config .golangci.yaml
 	@set -eu; lint_tmp=$$(mktemp -d); trap 'rm -rf "$$lint_tmp"' EXIT; \
-	  "$(GOLANGCI_LINT)" run --config .golangci.yaml --issues-exit-code=0 --show-stats=false \
+	  lint_os=$$(go env GOOS); lint_arch=$$(go env GOARCH); \
+	  CGO_ENABLED=0 GOFLAGS= GOEXPERIMENT= GOWORK=off "$(GOLANGCI_LINT)" run --config .golangci.yaml --issues-exit-code=0 --show-stats=false \
 	    --output.json.path="$$lint_tmp/issues.json" --output.text.path="$$lint_tmp/issues.txt" ./...; \
-	  go run -mod=readonly ./utils/lintbaseline "$$lint_tmp/issues.json" "$(GOLANGCI_LINT_BASELINE)" "$(GOLANGCI_LINT_VERSION)"
+	  GOOS= GOARCH= CGO_ENABLED=0 GOFLAGS= GOEXPERIMENT= GOWORK=off go run -mod=readonly ./utils/lintbaseline "$(GOLANGCI_LINT_VERSION)" "$$lint_os/$$lint_arch" < "$$lint_tmp/issues.json"
 
 .PHONY: golangci-full
 golangci-full: golangci-lint ## Report all issues, including reviewed style debt
 	"$(GOLANGCI_LINT)" fmt --diff --config .golangci.yaml
-	"$(GOLANGCI_LINT)" run --config .golangci.yaml ./...
+	CGO_ENABLED=0 GOFLAGS= GOEXPERIMENT= GOWORK=off "$(GOLANGCI_LINT)" run --config .golangci.yaml ./...
 
 # ======================================================================================================================
 # Miscellaneous targets
@@ -414,6 +413,11 @@ golangci-full: golangci-lint ## Report all issues, including reviewed style debt
 # Test targets
 # ======================================================================================================================
 ##@ Test
+
+.PHONY: test-lint
+test-lint: ## Verify the strict lint baseline and Make failure controls
+	CGO_ENABLED=0 go test -mod=readonly ./utils/lintbaseline
+	python3 scripts/test-lint-gate.py
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Startup cluster members via docker compose
@@ -627,17 +631,16 @@ test-clean: gotestsum ## Clean the go test cache
 # ----------------------------------------------------------------------------------------------------------------------
 # Obtain the golangci-lint binary
 # ----------------------------------------------------------------------------------------------------------------------
-# Check the cached binary on every invocation, including after a version change.
-# Use the official release binary and the installer from the same immutable tag;
-# the upstream installer verifies the archive against the release checksums.
 .PHONY: golangci-lint
 golangci-lint:
-	@if [ ! -x "$(GOLANGCI_LINT)" ] || [ "$$("$(GOLANGCI_LINT)" version --short 2>/dev/null)" != "$(GOLANGCI_LINT_VERSION)" ]; then \
+	@set -eu; if [ ! -x "$(GOLANGCI_LINT)" ]; then \
+	  test "$(GOLANGCI_LINT)" = "$(TOOLS_BIN)/golangci-lint"; \
 	  mkdir -p "$(TOOLS_BIN)"; \
-	  curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/v$(GOLANGCI_LINT_VERSION)/install.sh | \
-	    sh -s -- -b "$(TOOLS_BIN)" v$(GOLANGCI_LINT_VERSION); \
+	  lint_installer=$$(mktemp); trap 'rm -f "$$lint_installer"' EXIT; \
+	  curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/v$(GOLANGCI_LINT_VERSION)/install.sh -o "$$lint_installer"; \
+	  sh "$$lint_installer" -b "$(TOOLS_BIN)" v$(GOLANGCI_LINT_VERSION); \
 	fi
-	@test "$$("$(GOLANGCI_LINT)" version --short)" = "$(GOLANGCI_LINT_VERSION)"
+	@set -eu; lint_version=$$("$(GOLANGCI_LINT)" version --short); test "$$lint_version" = "$(GOLANGCI_LINT_VERSION)"
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Find or download gotestsum

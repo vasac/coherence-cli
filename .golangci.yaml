@@ -3,17 +3,17 @@
 # https://oss.oracle.com/licenses/upl.
 #
 # v2 migration: gosimple is part of staticcheck; type checking is mandatory.
-# gofmt is checked without rewriting files by make golangci.
+# Formatting is checked without rewriting files by make golangci.
+# Existing exclusions are retained and narrowed to their original linter/path.
 version: "2"
 run:
   relative-path-mode: gomod
   modules-download-mode: readonly
   tests: true
-  timeout: 10m
+  timeout: 5m
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
-  # Keep different linters on the same line visible to the exact baseline.
   uniq-by-line: false
 linters:
   default: none
@@ -35,7 +35,6 @@ linters:
       - legacy
       - std-error-handling
     rules:
-      # Existing integer-conversion exceptions; this migration does not expand them.
       - path: '^pkg/cmd/formatting\.go$'
         linters: [gosec]
         text: '^G115:'
@@ -57,7 +56,6 @@ linters:
       - path: '^pkg/cmd/root_test\.go$'
         linters: [gosec]
         text: '^G115:'
-      # Preserve the previous stutter exception, scoped to revive.
       - path: (.+)\.go$
         linters: [revive]
         text: stutter

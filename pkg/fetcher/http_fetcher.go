@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, 2025 Oracle and/or its affiliates.
+ * Copyright (c) 2021, 2026 Oracle and/or its affiliates.
  * Licensed under the Universal Permissive License v 1.0 as shown at
  * https://oss.oracle.com/licenses/upl.
  */
@@ -9,6 +9,7 @@ package fetcher
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -70,6 +71,8 @@ type HTTPFetcher struct {
 	WebLogicServer bool
 	Username       string
 	ClusterName    string
+	// Context is optional; managed restart supplies it during shutdown waiting.
+	Context context.Context
 }
 
 func (h HTTPFetcher) Init() error {
@@ -1327,7 +1330,11 @@ func httpRequestWithHeaders(h HTTPFetcher, requestType, urlAppend string, absolu
 			return http.ErrUseLastResponse
 		}}
 
-	req, err = http.NewRequest(requestType, finalURL, bytes.NewBuffer(content))
+	requestContext := h.Context
+	if requestContext == nil {
+		requestContext = context.Background()
+	}
+	req, err = http.NewRequestWithContext(requestContext, requestType, finalURL, bytes.NewBuffer(content))
 	if err != nil {
 		return constants.EmptyByte, nil, err
 	}

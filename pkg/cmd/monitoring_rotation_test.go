@@ -22,7 +22,7 @@ import (
 // cases fail if either discovery path omits --all. Rejection exercises init's
 // real preflight and verifies it never stages or replaces the active files.
 func TestMonitoringInitializationRequiresContainerRemoval(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == managementTestWindows {
 		t.Skip("Docker command stub requires a POSIX shell")
 	}
 	originalDirectory, originalVersion := cfgDirectory, Version
