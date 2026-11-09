@@ -134,6 +134,9 @@ follow another hostname or port.
 replacement behavior. A saved exception cannot authorize an untrusted download.
 |===
 
+For step-by-step comparisons with the previous commands, see
+xref:../examples/tls_certificate_validation.adoc[TLS Certificate Validation Changes].
+
 === Working with basic authentication REST endpoints
 
 If you have enabled basic authentication for your Management over REST endpoint, or you are connecting to a WebLogic Server cluster, you must
