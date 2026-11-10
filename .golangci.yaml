@@ -10,7 +10,7 @@ run:
   relative-path-mode: gomod
   modules-download-mode: readonly
   tests: true
-  timeout: 5m
+  timeout: 10m
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0

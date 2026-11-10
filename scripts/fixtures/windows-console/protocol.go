@@ -92,7 +92,7 @@ func readConsoleRequest(root *os.Root) (request consoleRequest, resultErr error)
 }
 
 func (r consoleRequest) arguments(directory string) ([]string, error) {
-	marker := strings.TrimPrefix(r.Cluster, "f1-console-")
+	marker := strings.TrimPrefix(r.Cluster, "console-test-")
 	if len(marker) != 12 || r.Cluster == marker {
 		return nil, errors.New("private cluster marker required")
 	}

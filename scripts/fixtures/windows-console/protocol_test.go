@@ -41,7 +41,7 @@ func TestConsoleApprovedProtocol(t *testing.T) {
 	cases := []struct{ op, phase, tail string }{{operationStart, phaseDelay, "-D 30s"}, {operationStart, phaseReadiness, singleReplicaSuffix}, {operationStart, "success", singleReplicaSuffix}, {operationCreate, phaseDelay, "-D 30s"}, {operationCreate, phaseReadiness, "-p 7574"}, {"restart", phaseReadiness, "-y"}, {"restart", "confirmation", singleReplicaSuffix}, {"scale", phaseReadiness, "-r 2"}}
 	for _, tt := range cases {
 		t.Run(tt.op+"/"+tt.phase, func(t *testing.T) {
-			request := consoleRequest{Operation: tt.op, Phase: tt.phase, Cluster: "f1-console-012345abcdef", Port: 30000, Event: 1}
+			request := consoleRequest{Operation: tt.op, Phase: tt.phase, Cluster: "console-test-012345abcdef", Port: 30000, Event: 1}
 			if tt.op == operationCreate {
 				request.ClusterPort = 7574
 			}
@@ -58,10 +58,10 @@ func TestConsoleApprovedProtocol(t *testing.T) {
 }
 
 func TestConsoleRejectsProtocolExpansion(t *testing.T) {
-	good := consoleRequest{Operation: operationStart, Phase: phaseReadiness, Cluster: "f1-console-012345abcdef", Port: 30000}
+	good := consoleRequest{Operation: operationStart, Phase: phaseReadiness, Cluster: "console-test-012345abcdef", Port: 30000}
 	for _, mutate := range []func(*consoleRequest){
 		func(r *consoleRequest) { r.Operation = "delete" }, func(r *consoleRequest) { r.Operation = "cmd.exe" }, func(r *consoleRequest) { r.Phase = "--password" },
-		func(r *consoleRequest) { r.Cluster = "../../outside" }, func(r *consoleRequest) { r.Cluster = "f1-console-012345abcdeg" }, func(r *consoleRequest) { r.Event = 2 },
+		func(r *consoleRequest) { r.Cluster = "../../outside" }, func(r *consoleRequest) { r.Cluster = "console-test-012345abcdeg" }, func(r *consoleRequest) { r.Event = 2 },
 		func(r *consoleRequest) { r.Port = 0 }, func(r *consoleRequest) { r.Port = 65536 }, func(r *consoleRequest) { r.ClusterPort = 7574 },
 		func(r *consoleRequest) { r.Operation = operationCreate; r.ClusterPort = r.Port }, func(r *consoleRequest) { r.Operation = operationCreate; r.Phase = "confirmation"; r.ClusterPort = 7574 },
 	} {

@@ -419,6 +419,22 @@ test-lint: ## Verify the strict lint baseline and Make failure controls
 	CGO_ENABLED=0 go test -mod=readonly ./utils/lintbaseline
 	python3 scripts/test-lint-gate.py
 
+.PHONY: test-local-management-support
+test-local-management-support: ## Test management listener inspection and REST readiness without starting Coherence
+	PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-local-management-support.py
+
+.PHONY: test-windows-console
+test-windows-console: ## Test Ctrl-C/Ctrl-Break cancellation on native Windows (requires Python and PowerShell)
+	@python3 -c 'import os, sys; sys.exit(0 if os.name == "nt" else "Native Windows is required for console tests")'
+	go test -mod=readonly -count=1 ./scripts/fixtures/windows-console
+	mkdir -p "$(BUILD_OUTPUT)/windows-console" "$(TEST_LOGS_DIR)"
+	go build -mod=readonly -trimpath -o "$(BUILD_OUTPUT)/windows-console/cohctl.exe" ./cohctl
+	go build -mod=readonly -trimpath -o "$(BUILD_OUTPUT)/windows-console/controller.exe" ./scripts/fixtures/windows-console
+	PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-windows-console.py \
+	  --cli "$(BUILD_OUTPUT)/windows-console/cohctl.exe" \
+	  --fixture "$(BUILD_OUTPUT)/windows-console/controller.exe" \
+	  --scratch-dir "$(BUILD_OUTPUT)/windows-console" --output "$(TEST_LOGS_DIR)/windows-console.json"
+
 # ----------------------------------------------------------------------------------------------------------------------
 # Startup cluster members via docker compose
 # ----------------------------------------------------------------------------------------------------------------------
