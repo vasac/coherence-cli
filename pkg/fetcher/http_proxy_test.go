@@ -37,7 +37,7 @@ import (
 )
 
 const (
-	proxyHelperEnv = "F4_TLS_PROXY_HELPER"
+	proxyHelperEnv = "COHCTL_TEST_TLS_PROXY_HELPER"
 	proxyTargetDNS = "cluster.fixture.invalid"
 	proxyTestUser  = "proxy-user"
 	proxyTestPass  = "proxy-password"
@@ -55,12 +55,12 @@ func TestConnectionTLSProxyHelper(t *testing.T) {
 		return
 	}
 	resetRequestTestState(t)
-	t.Setenv("COHERENCE_TLS_CERTS_PATH", os.Getenv("F4_PROXY_CA"))
-	f, err := GetFetcherForConnection(HTTP, os.Getenv("F4_PROXY_TARGET"), "", "", "proxy-fixture", os.Getenv("F4_PROXY_OPT_IN") == "true")
+	t.Setenv("COHERENCE_TLS_CERTS_PATH", os.Getenv("COHCTL_TEST_TLS_PROXY_CA"))
+	f, err := GetFetcherForConnection(HTTP, os.Getenv("COHCTL_TEST_TLS_PROXY_TARGET"), "", "", "proxy-fixture", os.Getenv("COHCTL_TEST_TLS_PROXY_OPT_IN") == "true")
 	if err != nil {
 		t.Fatal(err)
 	}
-	count, err := strconv.Atoi(os.Getenv("F4_PROXY_REQUEST_COUNT"))
+	count, err := strconv.Atoi(os.Getenv("COHCTL_TEST_TLS_PROXY_REQUEST_COUNT"))
 	if err != nil || count < 1 || count > 4 {
 		t.Fatal("invalid helper request count")
 	}
@@ -70,7 +70,7 @@ func TestConnectionTLSProxyHelper(t *testing.T) {
 		wg.Go(func() {
 			var body []byte
 			var requestErr error
-			if absolute := os.Getenv("F4_PROXY_ABSOLUTE"); absolute != "" {
+			if absolute := os.Getenv("COHCTL_TEST_TLS_PROXY_ABSOLUTE"); absolute != "" {
 				body, requestErr = httpGetRequestAbsolute(f.(HTTPFetcher), absolute)
 			} else {
 				body, requestErr = f.GetClusterDetailsJSON()
@@ -228,8 +228,8 @@ func runProxyRequestHelper(t *testing.T, proxy, target, absolute, caFile string,
 		command.Env = append(command.Env, item)
 	}
 	command.Env = append(command.Env, proxyHelperEnv+"=1", "HTTP_PROXY="+proxy, "HTTPS_PROXY="+proxy,
-		"F4_PROXY_TARGET="+target, "F4_PROXY_ABSOLUTE="+absolute, "F4_PROXY_CA="+caFile,
-		"F4_PROXY_OPT_IN="+strconv.FormatBool(optIn), "F4_PROXY_REQUEST_COUNT="+strconv.Itoa(count))
+		"COHCTL_TEST_TLS_PROXY_TARGET="+target, "COHCTL_TEST_TLS_PROXY_ABSOLUTE="+absolute, "COHCTL_TEST_TLS_PROXY_CA="+caFile,
+		"COHCTL_TEST_TLS_PROXY_OPT_IN="+strconv.FormatBool(optIn), "COHCTL_TEST_TLS_PROXY_REQUEST_COUNT="+strconv.Itoa(count))
 	var stderr bytes.Buffer
 	command.Stderr = &stderr
 	output, err := command.Output()

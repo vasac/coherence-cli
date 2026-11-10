@@ -30,7 +30,7 @@ import (
 	"github.com/oracle/coherence-cli/internal/testtls"
 )
 
-const downloadProxyHelperEnv = "F4_DOWNLOAD_PROXY_HELPER"
+const downloadProxyHelperEnv = "COHCTL_TEST_DOWNLOAD_PROXY_HELPER"
 
 type downloadProxyResult struct {
 	Body  string
@@ -44,14 +44,14 @@ func TestDownloadProxyHelper(t *testing.T) {
 		return
 	}
 	resetConnectionRequestState(t)
-	t.Setenv("COHERENCE_TLS_CERTS_PATH", os.Getenv("F4_DOWNLOAD_CA"))
-	t.Setenv("COHERENCE_TLS_CLIENT_CERT", os.Getenv("F4_DOWNLOAD_CLIENT"))
-	t.Setenv("COHERENCE_TLS_CLIENT_KEY", os.Getenv("F4_DOWNLOAD_KEY"))
+	t.Setenv("COHERENCE_TLS_CERTS_PATH", os.Getenv("COHCTL_TEST_DOWNLOAD_PROXY_CA"))
+	t.Setenv("COHERENCE_TLS_CLIENT_CERT", os.Getenv("COHCTL_TEST_DOWNLOAD_PROXY_CLIENT"))
+	t.Setenv("COHERENCE_TLS_CLIENT_KEY", os.Getenv("COHCTL_TEST_DOWNLOAD_PROXY_KEY"))
 	optIn := true
 	Config = CoherenceCLIConfig{IgnoreInvalidCerts: true, CurrentContext: exceptedConnection,
 		Clusters: []ClusterConnection{{Name: exceptedConnection, ConnectionType: httpType,
-			ConnectionURL: os.Getenv("F4_DOWNLOAD_TARGET"), IgnoreInvalidCerts: &optIn}}}
-	body, err := GetURLContents(os.Getenv("F4_DOWNLOAD_TARGET"))
+			ConnectionURL: os.Getenv("COHCTL_TEST_DOWNLOAD_PROXY_TARGET"), IgnoreInvalidCerts: &optIn}}}
+	body, err := GetURLContents(os.Getenv("COHCTL_TEST_DOWNLOAD_PROXY_TARGET"))
 	result := downloadProxyResult{Body: string(body)}
 	if err != nil {
 		result.Error = err.Error()
@@ -195,7 +195,7 @@ func runDownloadProxyHelper(t *testing.T, proxy, target, roots, clientFile, keyF
 	}
 	home := t.TempDir()
 	command.Env = append(command.Env, downloadProxyHelperEnv+"=1", "HTTP_PROXY="+proxy, "HTTPS_PROXY="+proxy,
-		"F4_DOWNLOAD_TARGET="+target, "F4_DOWNLOAD_CA="+roots, "F4_DOWNLOAD_CLIENT="+clientFile, "F4_DOWNLOAD_KEY="+keyFile,
+		"COHCTL_TEST_DOWNLOAD_PROXY_TARGET="+target, "COHCTL_TEST_DOWNLOAD_PROXY_CA="+roots, "COHCTL_TEST_DOWNLOAD_PROXY_CLIENT="+clientFile, "COHCTL_TEST_DOWNLOAD_PROXY_KEY="+keyFile,
 		"HOME="+home, "USERPROFILE="+home, "COHCTL_HOME="+home)
 	output, err := command.CombinedOutput()
 	if err != nil {

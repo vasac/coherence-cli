@@ -185,7 +185,7 @@ func TestLegacyTLSMigrationEligibility(t *testing.T) {
 	}
 }
 
-func TestF4JSONWritesPreserveUnknownNumbers(t *testing.T) {
+func TestConfigJSONWritesPreserveUnknownNumbers(t *testing.T) {
 	const migrationPhase, startupPhase = "migration", "startup"
 	for _, phase := range []string{migrationPhase, startupPhase, "setter"} {
 		t.Run(phase, func(t *testing.T) {
@@ -247,7 +247,7 @@ func TestF4JSONWritesPreserveUnknownNumbers(t *testing.T) {
 	}
 }
 
-func TestF4JSONUpdateRejectsTrailingData(t *testing.T) {
+func TestConfigJSONUpdateRejectsTrailingData(t *testing.T) {
 	for _, suffix := range []string{"{}", "true", "malformed-json"} {
 		t.Run(suffix, func(t *testing.T) {
 			file := filepath.Join(t.TempDir(), "selected.json")
@@ -519,14 +519,14 @@ func (f *faultMigrationFile) Close() error {
 // The helper runs the real Cobra startup in a separate process: initConfig's
 // os.Exit failures must prevent both command execution and its network request.
 func TestLegacyTLSStartupHelper(t *testing.T) {
-	if os.Getenv("F4_MIGRATION_STARTUP_HELPER") == "" {
+	if os.Getenv("COHCTL_TEST_TLS_MIGRATION_STARTUP_HELPER") == "" {
 		return
 	}
 	Version = migrationStartupVersion
 	cli := Initialize(nil)
 	cli.AddCommand(&cobra.Command{Use: "migration-probe", RunE: func(cmd *cobra.Command, _ []string) error {
 		// #nosec G704 -- The parent test supplies only its task-owned loopback HTTP fixture URL.
-		response, err := http.Get(os.Getenv("F4_MIGRATION_PROBE_URL"))
+		response, err := http.Get(os.Getenv("COHCTL_TEST_TLS_MIGRATION_PROBE_URL"))
 		if err != nil {
 			return err
 		}
@@ -537,7 +537,7 @@ func TestLegacyTLSStartupHelper(t *testing.T) {
 			migrationVersionKey: Config.Version, "color": Config.Color, "clusters": Config.Clusters,
 		})
 	}})
-	cli.SetArgs([]string{configOption, os.Getenv("F4_MIGRATION_CONFIG"), "migration-probe"})
+	cli.SetArgs([]string{configOption, os.Getenv("COHCTL_TEST_TLS_MIGRATION_CONFIG"), "migration-probe"})
 	if err := cli.Execute(); err != nil {
 		t.Fatal(err)
 	}
@@ -706,8 +706,8 @@ func runMigrationStartup(t *testing.T, file, probeURL string) ([]byte, []byte, e
 	home := t.TempDir()
 	// #nosec G204 G702 -- Execute this test binary only; fixed test selector, isolated child configuration and local fixture URL.
 	command := exec.Command(os.Args[0], "-test.run=^TestLegacyTLSStartupHelper$")
-	command.Env = append(os.Environ(), "F4_MIGRATION_STARTUP_HELPER=1", "F4_MIGRATION_CONFIG="+file,
-		"F4_MIGRATION_PROBE_URL="+probeURL, "COHCTL_HOME="+home, "HOME="+home, "USERPROFILE="+home)
+	command.Env = append(os.Environ(), "COHCTL_TEST_TLS_MIGRATION_STARTUP_HELPER=1", "COHCTL_TEST_TLS_MIGRATION_CONFIG="+file,
+		"COHCTL_TEST_TLS_MIGRATION_PROBE_URL="+probeURL, "COHCTL_HOME="+home, "HOME="+home, "USERPROFILE="+home)
 	var stdout, stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
 	err := command.Run()
