@@ -3,7 +3,7 @@
 # Licensed under the Universal Permissive License v 1.0 as shown at
 # https://oss.oracle.com/licenses/upl.
 
-# Read-only management checks against the task's secure standalone fixture.
+# Read-only management checks against a secure standalone fixture.
 set -euo pipefail
 
 URL=${1:-https://127.0.0.1:30000/management/coherence/cluster}

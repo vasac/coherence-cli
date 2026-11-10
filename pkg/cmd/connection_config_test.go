@@ -176,7 +176,7 @@ clusters:
 				t.Fatalf("legacy/new connections changed after save/reload: got %#v, want %#v", got, want)
 			}
 			if got.IgnoreInvalidCerts != test.value {
-				t.Fatal("the preparatory model change must preserve the legacy global value")
+				t.Fatal("saving and reloading must preserve the legacy global value")
 			}
 			for _, connection := range got.Clusters {
 				if connection.IgnoreInvalidCerts != nil {
