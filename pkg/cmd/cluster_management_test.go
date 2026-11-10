@@ -1135,8 +1135,8 @@ func TestManagementLauncherCapability(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			managedTestState(t)
 			queries := filepath.Join(t.TempDir(), "queries")
-			t.Setenv("F1_QUERIES", queries)
-			fakeJava(t, fmt.Sprintf(`printf 'query\n' >> "$F1_QUERIES"; echo 'openjdk version "%d.0.21"' >&2`, tc.major))
+			t.Setenv("COHCTL_TEST_JAVA_VERSION_QUERIES", queries)
+			fakeJava(t, fmt.Sprintf(`printf 'query\n' >> "$COHCTL_TEST_JAVA_VERSION_QUERIES"; echo 'openjdk version "%d.0.21"' >&2`, tc.major))
 			connection := ClusterConnection{Name: managementFixtureName, ManuallyCreated: true, ConnectionType: httpType, ManagementPort: 30000, ClusterVersion: tc.version, Arguments: tc.options}
 			var err error
 			if tc.invalid {

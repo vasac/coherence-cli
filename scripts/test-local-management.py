@@ -3,7 +3,7 @@
 # Licensed under the Universal Permissive License v 1.0 as shown at
 # https://oss.oracle.com/licenses/upl.
 
-"""Local F1 runtime gate. Requires java/javac, cached Maven dependencies and lsof.
+"""Local management integration tests. Requires java/javac, cached Maven dependencies and lsof.
 
 Uses task-owned config/JVMs, local REST/JMX success, PID-owned listener inspection,
 and negative probes through a real host interface with a positive TCP control.
@@ -13,7 +13,6 @@ This is same-host evidence; second-host and insecure-remote qualification are se
 import argparse
 import base64
 from datetime import datetime, timezone
-import hashlib
 import json
 import os
 from pathlib import Path
@@ -29,7 +28,7 @@ import urllib.request
 import uuid
 import shlex
 
-import f1_platform as native
+import management_platform as native
 
 
 def wait_for_rest_membership(expected, endpoints, read_members, timeout=30, poll_interval=.1):
@@ -73,7 +72,6 @@ def main():
     parser.add_argument("--cluster-port", type=int, help="assigned fixed NameService/cluster test port")
     parser.add_argument("--jmx-port", type=int, help="assigned fixed registry/RMI test port")
     parser.add_argument("--initialize-config", action="store_true", help="run version first as an explicit initialized-configuration control")
-    parser.add_argument("--peer-config", type=Path, help="assigned isolated peer JSON: argv, scope, resource description")
     args = parser.parse_args()
     assigned_ports = [port for port in (args.rest_port, args.cluster_port, args.jmx_port) if port is not None]
     if any(not 0 < port < 65536 for port in assigned_ports) or len(assigned_ports) != len(set(assigned_ports)):
@@ -83,19 +81,15 @@ def main():
         raise RuntimeError("MISSING COVERAGE: java and javac are required")
     root = Path(__file__).resolve().parent.parent
     cli = str(Path(args.cli).resolve())
-    base = args.scratch_dir or Path("/private/tmp/codex-work" if Path("/private/tmp").exists() else tempfile.gettempdir())
+    base = args.scratch_dir or Path(tempfile.gettempdir())
     base.mkdir(parents=True, exist_ok=True)
     evidence = {"version": args.version, "platform": native.identity(),
                 "started_at": datetime.now(timezone.utc).isoformat(), "status": "RUNNING",
                 "java": subprocess.check_output(["java", "-version"], stderr=subprocess.STDOUT, text=True).strip(),
-                "cli_sha256": hashlib.sha256(Path(cli).read_bytes()).hexdigest(),
-                "harness_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-                "probe_sha256": hashlib.sha256((root / "scripts" / "ManagementProbe.java").read_bytes()).hexdigest(),
-                "topology": "same host, real non-loopback interface; no second-host test", "checks": [], "commands": [],
-                "adapter_sha256": hashlib.sha256((root / "scripts" / "f1_platform.py").read_bytes()).hexdigest()}
+                "topology": "same host, real non-loopback interface; no second-host test", "checks": [], "commands": []}
     evidence["requested_fixed_ports"] = {"rest": args.rest_port, "cluster": args.cluster_port, "jmx": args.jmx_port}
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-    marker = "f1-" + uuid.uuid4().hex[:12]
+    marker = "management-test-" + uuid.uuid4().hex[:12]
     evidence["cluster_name"] = marker
 
     local_host = "127.0.0.1"
@@ -139,7 +133,7 @@ def main():
     evidence["interface"] = interface
     evidence["positive_tcp_control"] = True
 
-    with tempfile.TemporaryDirectory(prefix="f1-management-", dir=base) as temp:
+    with tempfile.TemporaryDirectory(prefix="management-test-", dir=base) as temp:
         config = Path(temp) / "config"
         config.mkdir()
         reserved = set(assigned_ports)
@@ -184,7 +178,7 @@ def main():
             evidence["commands"].append({"argv": [cli, "--config-dir", str(config), *map(str, words)],
                                          "exit_code": result.returncode, "expected_success": success,
                                          "elapsed_seconds": time.monotonic() - started,
-                                         "stdout_sha256": hashlib.sha256(result.stdout.encode()).hexdigest(), "stdout": result.stdout})
+                                         "stdout": result.stdout})
             print("cohctl", *words, flush=True)
             if (result.returncode == 0) != success:
                 raise AssertionError(result.stdout)
@@ -199,12 +193,6 @@ def main():
 
         def marked_processes():
             return set(native.processes(marker))
-
-        peer = None
-
-        def set_host(host):
-            nonlocal local_host
-            local_host = host
 
         def inspect(label, expected_http, with_jmx, bind_address="127.0.0.1"):
             remote = bind_address != "127.0.0.1"
@@ -228,9 +216,6 @@ def main():
                 if state:
                     with observer_lock:
                         linux_identities.setdefault(f"{pid}:{state['start_ticks']}", state)
-                classpath = tokens[tokens.index("-cp") + 1]
-                snapshot["classpath"] = [{"path": item, "sha256": hashlib.sha256(Path(item).read_bytes()).hexdigest()}
-                                         for item in classpath.split(os.pathsep)]
                 # The Coherence log names each selected management HTTP acceptor.
                 log = (config / "logs" / marker / (member + ".log")).read_text()
                 ports = set(map(int, re.findall(r"HttpAcceptor now listening for connections on [^\n]*?:(\d+)", log)))
@@ -288,17 +273,12 @@ def main():
                 control.bind((interface, 0)); control.listen(1)
                 assert connect(interface, control.getsockname()[1]), "same-case positive interface control failed"
                 record["positive_control"] = f"{interface}:{control.getsockname()[1]}"
-            if peer:
-                peer.check(record, jmx)
             evidence["checks"].append(record)
             print(label, "PASS", rest, output.strip(), flush=True)
             return record
 
         try:
             subprocess.run(["javac", "-d", temp, str(root / "scripts" / "ManagementProbe.java")], check=True)
-            if args.peer_config:
-                from f1_remote import Peer
-                peer = Peer(args.peer_config, interface, evidence)
             create = ["create", "cluster", marker, "-y", "-I", "-v", args.version, "-r", 2, "-H", http, "-p", cluster]
             if args.download_deps:
                 create.remove("-I")
@@ -315,8 +295,8 @@ def main():
             evidence["name_service_discovery"] = "PASS"
             if args.monitor:
                 fixture = Path(temp) / "monitor.expect"
-                fixture.write_text((root / "scripts" / "monitor.expect").read_text().replace("monitor cluster local", "monitor cluster $env(F1_CLUSTER)"))
-                environment = dict(os.environ, DIR=str(root), CONFIG_DIR=str(config), F1_CLUSTER=marker)
+                fixture.write_text((root / "scripts" / "monitor.expect").read_text().replace("monitor cluster local", "monitor cluster $env(COHCTL_TEST_CLUSTER)"))
+                environment = dict(os.environ, DIR=str(root), CONFIG_DIR=str(config), COHCTL_TEST_CLUSTER=marker)
                 result = subprocess.run(["expect", "-f", str(fixture)], env=environment, text=True,
                                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=30)
                 assert result.returncode == 0 and "Coherence CLI" in result.stdout, result.stdout
@@ -340,7 +320,7 @@ def main():
             assert (config / "cohctl.yaml").read_bytes() == before
             assert members() == old_members and marked_processes() == set(old_members.values()), "invalid restart changed running members"
             evidence["invalid_restart"] = {"result": "PASS", "members_before": old_members, "members_after": members(),
-                                           "config_sha256_before_and_after": hashlib.sha256(before).hexdigest(), "no_replacement": True}
+                                           "no_replacement": True}
             command("restart", "cluster", marker, "-y", "-r", 2, "--management-address=localhost", "--jmx-port=0")
             # Restart without -N retains the ordinary single REST selection.
             record = inspect("restart override persistence / explicit JMX disable", 1, False)
@@ -352,11 +332,7 @@ def main():
             assert marker in command("get", "clusters") and output
             saved = (config / "cohctl.yaml").read_text()
             assert "http://127.0.0.1:" in saved and "jmxport: 0" in saved
-            record["saved_config_sha256"] = hashlib.sha256((config / "cohctl.yaml").read_bytes()).hexdigest()
             record["saved_loopback_url_and_jmx_zero"] = True
-            if peer:
-                from f1_remote import qualify
-                qualify(command, inspect, config, marker, interface, http, cluster, jmx, create, set_host, evidence)
             if marked_processes():
                 command("stop", "cluster", marker, "-y", env=no_java)
             deadline = time.monotonic() + 10
@@ -371,7 +347,6 @@ def main():
             if selected.exists():
                 body = selected.read_bytes()
                 evidence["failed_configuration"] = {"encoding": "base64", "original_length": len(body),
-                                                    "sha256": hashlib.sha256(body).hexdigest(),
                                                     "data": base64.b64encode(body).decode()}
             evidence["logs"] = {log.name: log.read_text() for log in sorted((config / "logs" / marker).glob("*.log"))}
             for name, content in evidence["logs"].items():
@@ -408,8 +383,6 @@ def main():
                                    "remaining_marked_pids": remaining, "linux_observed_identities": linux_identities,
                                    "remaining_owned_kernel_processes": kernel_remaining, "observer_errors": observer_errors,
                                    "result": "FAIL" if remaining or kernel_remaining or observer_errors else "PASS"}
-            if peer:
-                peer.close()
             evidence["finished_at"] = datetime.now(timezone.utc).isoformat()
             if remaining or kernel_remaining or observer_errors:
                 evidence["status"] = "FAIL"

@@ -68,6 +68,10 @@ jobs:
       run: |
         make copyright
 
+    - name: Local Management Harness Tests
+      shell: bash
+      run: make test-local-management-support
+
     - name: Unit Tests
       shell: bash
       run: make test-cohctl

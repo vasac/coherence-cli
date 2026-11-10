@@ -347,8 +347,8 @@ MANAGEMENT_TEST_ARGS=()
 if [ -n "$COM" ]; then
   MANAGEMENT_TEST_ARGS+=(--commercial)
 fi
-if [ -n "$COHCTL_F1_EVIDENCE" ]; then
-  MANAGEMENT_TEST_ARGS+=(--output "$COHCTL_F1_EVIDENCE")
+if [ -n "$COHCTL_MANAGEMENT_TEST_OUTPUT" ]; then
+  MANAGEMENT_TEST_ARGS+=(--output "$COHCTL_MANAGEMENT_TEST_OUTPUT")
 fi
 python3 "$DIR/scripts/test-local-management.py" "$VERSION" --cli "$DIR/bin/cohctl" "${MANAGEMENT_TEST_ARGS[@]}" || exit 1
 

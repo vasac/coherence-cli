@@ -2,13 +2,13 @@
   "version": 1,
   "tool_version": "2.15.0",
   "go_version": "go1.27.3",
-  "config_sha256": "d79070fb7ec1c285213e4256364c3940839c4aaaead479c529ff87d6ebab83d1",
+  "config_sha256": "1161f99a16f120ce3f43e1d2c70fa7fcf7fb5defc4a87519faa2ed51ec047ee9",
   "platforms": [
     "darwin/arm64",
     "linux/amd64",
     "windows/amd64"
   ],
-  "review": "CONTRIBUTING.md#local-checks; exact existing origin/main and F1 style signatures reconciled during rebase",
+  "review": "CONTRIBUTING.md#local-checks",
   "issues": [
     {
       "linter": "goconst",
@@ -17,7 +17,7 @@
       "source": [
         "\tUse:   \"cache cache-name\","
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/cache.go:134. Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
+      "reason": "Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
     },
     {
       "linter": "goconst",
@@ -26,7 +26,7 @@
       "source": [
         "\t\t\"bufferPublishSize\", \"bufferReceiveSize\", \"loggingLevel\", \"loggingLimit\", \"loggingFormat\","
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/cluster.go:37. Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
+      "reason": "Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
     },
     {
       "linter": "goconst",
@@ -35,7 +35,7 @@
       "source": [
         "\t\t\"bufferPublishSize\", \"bufferReceiveSize\", \"loggingLevel\", \"loggingLimit\", \"loggingFormat\","
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/cluster.go:37. Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
+      "reason": "Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
     },
     {
       "linter": "goconst",
@@ -44,7 +44,7 @@
       "source": [
         "\tUse:   \"cluster connection-name\","
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/cluster.go:54. Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
+      "reason": "Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
     },
     {
       "linter": "goconst",
@@ -53,7 +53,7 @@
       "source": [
         "\t\t\t\t[]string{\"cluster\", \"machines\", \"members\", \"services\", \"caches\", \"proxies\", \"reporters\", constants.RAMJournal,"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/cluster.go:281. Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
+      "reason": "Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
     },
     {
       "linter": "goconst",
@@ -62,7 +62,7 @@
       "source": [
         "\t\t\t\t[]string{\"cluster\", \"machines\", \"members\", \"services\", \"caches\", \"proxies\", \"reporters\", constants.RAMJournal,"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/cluster.go:281. Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
+      "reason": "Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
     },
     {
       "linter": "goconst",
@@ -80,7 +80,7 @@
       "source": [
         "\t\t\t\t[]string{\"cluster\", \"machines\", \"members\", \"services\", \"caches\", \"proxies\", \"reporters\", constants.RAMJournal,"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/cluster.go:281. Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
+      "reason": "Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
     },
     {
       "linter": "goconst",
@@ -89,7 +89,7 @@
       "source": [
         "\t\t\t\t\tconstants.FlashJournal, \"httpServers\", \"executors\", \"federationDestinations\", \"federationOrigins\", \"health\"})"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/cluster.go:282. Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
+      "reason": "Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
     },
     {
       "linter": "goconst",
@@ -98,7 +98,7 @@
       "source": [
         "\t\t\t\tif entry.Artifact != \"jline\" && entry.Artifact != \"coherence\" {"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/cluster.go:1014. Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
+      "reason": "Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
     },
     {
       "linter": "goconst",
@@ -107,7 +107,7 @@
       "source": [
         "\t\t{GroupID: ceGroupID, Artifact: \"coherence\", IsCoherence: true},"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/cluster_utils.go:70. Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
+      "reason": "Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
     },
     {
       "linter": "goconst",
@@ -116,7 +116,7 @@
       "source": [
         "\tUse:   \"health\","
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/health.go:36. Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
+      "reason": "Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
     },
     {
       "linter": "goconst",
@@ -125,7 +125,7 @@
       "source": [
         "\tvalidAttributes = []string{\"loggingLevel\", \"resendDelay\", \"sendAckDelay\","
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/member.go:40. Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
+      "reason": "Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
     },
     {
       "linter": "goconst",
@@ -134,7 +134,7 @@
       "source": [
         "\t\t\"trafficJamCount\", \"trafficJamDelay\", \"loggingLimit,\", \"loggingFormat\"}"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/member.go:41. Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
+      "reason": "Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
     },
     {
       "linter": "goconst",
@@ -143,7 +143,7 @@
       "source": [
         "\tUse:   \"members\","
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/member.go:64. Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
+      "reason": "Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
     },
     {
       "linter": "goconst",
@@ -152,7 +152,7 @@
       "source": [
         "\t\t\"default\":            \"summary-cluster,summary-members,machines:services,caches:proxies,http-servers:health-summary,persistence:federation-all,elastic-data:network-stats\","
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/monitor_cluster.go:43. Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
+      "reason": "Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
     },
     {
       "linter": "goconst",
@@ -161,7 +161,7 @@
       "source": [
         "\tUse:   \"cluster connection-name\","
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/monitor_cluster.go:227. Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
+      "reason": "Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
     },
     {
       "linter": "goconst",
@@ -170,7 +170,7 @@
       "source": [
         "\tUse:   \"monitoring\","
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/monitoring.go:81. Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
+      "reason": "Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
     },
     {
       "linter": "goconst",
@@ -476,7 +476,7 @@
       "source": [
         "\tUse:   \"proxies\","
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/proxy.go:30. Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
+      "reason": "Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
     },
     {
       "linter": "goconst",
@@ -494,7 +494,7 @@
       "source": [
         "\t\tfinalResult, err = utils.CombineByteArraysForJSON([][]byte{serviceResult, proxyResults}, []string{\"services\", \"members\"})"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/proxy.go:354. Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
+      "reason": "Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
     },
     {
       "linter": "goconst",
@@ -503,7 +503,7 @@
       "source": [
         "\t\tConfig.DefaultStyle = \"default\""
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/root.go:426. Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
+      "reason": "Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
     },
     {
       "linter": "goconst",
@@ -512,7 +512,7 @@
       "source": [
         "\tnewCluster := ClusterConnection{Name: \"cluster1\", ConnectionType: \"http\", ConnectionURL: \"dummy\","
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/root_test.go:82. Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
+      "reason": "Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
     },
     {
       "linter": "goconst",
@@ -530,7 +530,7 @@
       "source": [
         "\t\t\t\t[]string{\"services\", \"proxies\", \"members\", \"partitions\", \"distribution\"})"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/service.go:827. Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
+      "reason": "Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
     },
     {
       "linter": "goconst",
@@ -539,7 +539,7 @@
       "source": [
         "\t\t\t\t[]string{\"services\", \"proxies\", \"members\", \"partitions\", \"distribution\"})"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/service.go:827. Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
+      "reason": "Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
     },
     {
       "linter": "goconst",
@@ -548,7 +548,7 @@
       "source": [
         "\t\t\t\t[]string{\"topics\", \"subscribers\", \"members\"})"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/topics.go:375. Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
+      "reason": "Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
     },
     {
       "linter": "goconst",
@@ -557,7 +557,7 @@
       "source": [
         "\tif string(result) != \"true\" {"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/common/common.go:800. Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
+      "reason": "Repeated CLI/configuration/fixture literal; constant extraction is deferred style cleanup."
     },
     {
       "linter": "revive",
@@ -566,7 +566,7 @@
       "source": [
         "\t. \"github.com/onsi/gomega\""
       ],
-      "reason": "Inherited at 9cef46ae980c:test/common/common.go:12. Existing Gomega assertion import style; no security or correctness diagnostic is accepted."
+      "reason": "Existing Gomega assertion import style; no security or correctness diagnostic is accepted."
     },
     {
       "linter": "revive",
@@ -575,7 +575,7 @@
       "source": [
         "\t\trestUrl = context.RestUrl"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/common/common.go:2139. Existing identifier acronym spelling; naming cleanup is independent of F1 behavior."
+      "reason": "Existing identifier acronym spelling; naming cleanup is deferred."
     },
     {
       "linter": "revive",
@@ -584,7 +584,7 @@
       "source": [
         "\tshortUrl := strings.ReplaceAll(strings.ReplaceAll(context.Url,"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/common/common.go:95. Existing identifier acronym spelling; naming cleanup is independent of F1 behavior."
+      "reason": "Existing identifier acronym spelling; naming cleanup is deferred."
     },
     {
       "linter": "revive",
@@ -593,7 +593,7 @@
       "source": [
         "func getVersion(restUrl string) (string, error) {"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/common/common.go:290. Existing identifier acronym spelling; naming cleanup is independent of F1 behavior."
+      "reason": "Existing identifier acronym spelling; naming cleanup is deferred."
     },
     {
       "linter": "revive",
@@ -602,7 +602,7 @@
       "source": [
         "\t\trestUrl       = context.RestUrl"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/common/common.go:950. Existing identifier acronym spelling; naming cleanup is independent of F1 behavior."
+      "reason": "Existing identifier acronym spelling; naming cleanup is deferred."
     },
     {
       "linter": "revive",
@@ -611,7 +611,7 @@
       "source": [
         "\t\trestUrl       = context.RestUrl"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/common/common.go:828. Existing identifier acronym spelling; naming cleanup is independent of F1 behavior."
+      "reason": "Existing identifier acronym spelling; naming cleanup is deferred."
     },
     {
       "linter": "revive",
@@ -620,7 +620,7 @@
       "source": [
         "\t\trestUrl = context.RestUrl"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/common/common.go:1970. Existing identifier acronym spelling; naming cleanup is independent of F1 behavior."
+      "reason": "Existing identifier acronym spelling; naming cleanup is deferred."
     },
     {
       "linter": "revive",
@@ -629,7 +629,7 @@
       "source": [
         "\t\trestUrl       = context.RestUrl"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/common/common.go:540. Existing identifier acronym spelling; naming cleanup is independent of F1 behavior."
+      "reason": "Existing identifier acronym spelling; naming cleanup is deferred."
     },
     {
       "linter": "revive",
@@ -638,7 +638,7 @@
       "source": [
         "\t\trestUrl       = context.RestUrl"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/common/common.go:309. Existing identifier acronym spelling; naming cleanup is independent of F1 behavior."
+      "reason": "Existing identifier acronym spelling; naming cleanup is deferred."
     },
     {
       "linter": "revive",
@@ -647,7 +647,7 @@
       "source": [
         "func RunTestHttpSessionCommands(t *testing.T) {"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/common/common.go:1025. Existing identifier acronym spelling; naming cleanup is independent of F1 behavior."
+      "reason": "Existing identifier acronym spelling; naming cleanup is deferred."
     },
     {
       "linter": "revive",
@@ -656,7 +656,7 @@
       "source": [
         "\t\trestUrl = context.RestUrl"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/common/common.go:1817. Existing identifier acronym spelling; naming cleanup is independent of F1 behavior."
+      "reason": "Existing identifier acronym spelling; naming cleanup is deferred."
     },
     {
       "linter": "revive",
@@ -665,7 +665,7 @@
       "source": [
         "\t\trestUrl = context.RestUrl"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/common/common.go:1663. Existing identifier acronym spelling; naming cleanup is independent of F1 behavior."
+      "reason": "Existing identifier acronym spelling; naming cleanup is deferred."
     },
     {
       "linter": "revive",
@@ -674,7 +674,7 @@
       "source": [
         "\trestUrl := context.RestUrl"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/common/common.go:1634. Existing identifier acronym spelling; naming cleanup is independent of F1 behavior."
+      "reason": "Existing identifier acronym spelling; naming cleanup is deferred."
     },
     {
       "linter": "revive",
@@ -683,7 +683,7 @@
       "source": [
         "\trestUrl := context.RestUrl"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/common/common.go:1301. Existing identifier acronym spelling; naming cleanup is independent of F1 behavior."
+      "reason": "Existing identifier acronym spelling; naming cleanup is deferred."
     },
     {
       "linter": "revive",
@@ -692,7 +692,7 @@
       "source": [
         "func RunTestHttpProxyCommands(t *testing.T) {"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/common/common.go:1452. Existing identifier acronym spelling; naming cleanup is independent of F1 behavior."
+      "reason": "Existing identifier acronym spelling; naming cleanup is deferred."
     },
     {
       "linter": "revive",
@@ -701,7 +701,7 @@
       "source": [
         "\trestUrl := context.RestUrl"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/common/common.go:1152. Existing identifier acronym spelling; naming cleanup is independent of F1 behavior."
+      "reason": "Existing identifier acronym spelling; naming cleanup is deferred."
     },
     {
       "linter": "revive",
@@ -710,7 +710,7 @@
       "source": [
         "\t\trestUrl = context.RestUrl"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/common/common.go:1078. Existing identifier acronym spelling; naming cleanup is independent of F1 behavior."
+      "reason": "Existing identifier acronym spelling; naming cleanup is deferred."
     },
     {
       "linter": "revive",
@@ -719,7 +719,7 @@
       "source": [
         "\trestUrl2 := strings.ReplaceAll(restUrl, \"8080\", \"8081\")"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/common/common.go:1783. Existing identifier acronym spelling; naming cleanup is independent of F1 behavior."
+      "reason": "Existing identifier acronym spelling; naming cleanup is deferred."
     },
     {
       "linter": "revive",
@@ -728,7 +728,7 @@
       "source": [
         "\t\trestUrl = context.RestUrl"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/common/common.go:1031. Existing identifier acronym spelling; naming cleanup is independent of F1 behavior."
+      "reason": "Existing identifier acronym spelling; naming cleanup is deferred."
     },
     {
       "linter": "revive",
@@ -737,7 +737,7 @@
       "source": [
         "\t\trestUrl = context.RestUrl"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/common/common.go:794. Existing identifier acronym spelling; naming cleanup is independent of F1 behavior."
+      "reason": "Existing identifier acronym spelling; naming cleanup is deferred."
     },
     {
       "linter": "revive",
@@ -746,7 +746,7 @@
       "source": [
         "func isHealthEnabled(restUrl string) bool {"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/common/common.go:2050. Existing identifier acronym spelling; naming cleanup is independent of F1 behavior."
+      "reason": "Existing identifier acronym spelling; naming cleanup is deferred."
     },
     {
       "linter": "revive",
@@ -755,7 +755,7 @@
       "source": [
         "\t\trestUrl = context.RestUrl"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/common/common.go:45. Existing identifier acronym spelling; naming cleanup is independent of F1 behavior."
+      "reason": "Existing identifier acronym spelling; naming cleanup is deferred."
     },
     {
       "linter": "revive",
@@ -764,7 +764,7 @@
       "source": [
         "\t. \"github.com/onsi/gomega\""
       ],
-      "reason": "Inherited at 9cef46ae980c:test/test_utils/test_utils.go:15. Existing Gomega assertion import style; no security or correctness diagnostic is accepted."
+      "reason": "Existing Gomega assertion import style; no security or correctness diagnostic is accepted."
     },
     {
       "linter": "revive",
@@ -773,7 +773,7 @@
       "source": [
         "\tHttpPort        int"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/test_utils/test_utils.go:34. Existing identifier acronym spelling; naming cleanup is independent of F1 behavior."
+      "reason": "Existing identifier acronym spelling; naming cleanup is deferred."
     },
     {
       "linter": "revive",
@@ -782,7 +782,7 @@
       "source": [
         "\tUrl             string"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/test_utils/test_utils.go:35. Existing identifier acronym spelling; naming cleanup is independent of F1 behavior."
+      "reason": "Existing identifier acronym spelling; naming cleanup is deferred."
     },
     {
       "linter": "revive",
@@ -791,7 +791,7 @@
       "source": [
         "\tRestUrl         string"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/test_utils/test_utils.go:36. Existing identifier acronym spelling; naming cleanup is independent of F1 behavior."
+      "reason": "Existing identifier acronym spelling; naming cleanup is deferred."
     },
     {
       "linter": "revive",
@@ -807,7 +807,7 @@
         "\t\t}",
         "\t}"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/test_utils/test_utils.go:186. Existing else after a returning branch; indentation simplification only."
+      "reason": "Existing else after a returning branch; indentation simplification only."
     },
     {
       "linter": "revive",
@@ -816,7 +816,7 @@
       "source": [
         "func StartDockerImage(t *testing.T, image string, name string, httpPort int, clusterName string, delete bool) (string, error) {"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/test_utils/test_utils.go:288. Existing fixture parameter spelling shadows a builtin; renaming only."
+      "reason": "Existing fixture parameter spelling shadows a builtin; renaming only."
     },
     {
       "linter": "revive",
@@ -825,7 +825,7 @@
       "source": [
         "func GetManagementUrl(httpPort int) string {"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/test_utils/test_utils.go:313. Existing identifier acronym spelling; naming cleanup is independent of F1 behavior."
+      "reason": "Existing identifier acronym spelling; naming cleanup is deferred."
     },
     {
       "linter": "revive",
@@ -834,7 +834,7 @@
       "source": [
         "func GetRestUrl(restPort int) string {"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/test_utils/test_utils.go:318. Existing identifier acronym spelling; naming cleanup is independent of F1 behavior."
+      "reason": "Existing identifier acronym spelling; naming cleanup is deferred."
     },
     {
       "linter": "revive",
@@ -843,7 +843,7 @@
       "source": [
         "\t\tCheckRedirect: func(req *http.Request, via []*http.Request) error {"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/test_utils/test_utils.go:373. Existing redirect callback parameter is unused; signature-preserving underscore cleanup only."
+      "reason": "Existing redirect callback parameter is unused; signature-preserving underscore cleanup only."
     },
     {
       "linter": "revive",
@@ -852,7 +852,7 @@
       "source": [
         "\t\tCheckRedirect: func(req *http.Request, via []*http.Request) error {"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/test_utils/test_utils.go:373. Existing redirect callback parameter is unused; signature-preserving underscore cleanup only."
+      "reason": "Existing redirect callback parameter is unused; signature-preserving underscore cleanup only."
     },
     {
       "linter": "revive",
@@ -861,7 +861,7 @@
       "source": [
         "func WaitForHttpReady(url string, timeout int) error {"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/test_utils/test_utils.go:384. Existing identifier acronym spelling; naming cleanup is independent of F1 behavior."
+      "reason": "Existing identifier acronym spelling; naming cleanup is deferred."
     },
     {
       "linter": "revive",
@@ -870,7 +870,7 @@
       "source": [
         "\treturn fmt.Errorf(\"Unable to connect to url %s after %d seconds\\n\", url, timeout)"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/test_utils/test_utils.go:425. Existing error capitalization/punctuation style; error handling remains enforced."
+      "reason": "Existing error capitalization/punctuation style; error handling remains enforced."
     },
     {
       "linter": "revive",
@@ -879,7 +879,7 @@
       "source": [
         "func WaitForHttpBalancedServices(url string, timeout int) error {"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/test_utils/test_utils.go:403. Existing identifier acronym spelling; naming cleanup is independent of F1 behavior."
+      "reason": "Existing identifier acronym spelling; naming cleanup is deferred."
     },
     {
       "linter": "revive",
@@ -888,7 +888,7 @@
       "source": [
         "\treturn fmt.Errorf(\"Unable to connect to url %s after %d seconds\\n\", url, timeout)"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/test_utils/test_utils.go:399. Existing error capitalization/punctuation style; error handling remains enforced."
+      "reason": "Existing error capitalization/punctuation style; error handling remains enforced."
     },
     {
       "linter": "staticcheck",
@@ -897,7 +897,7 @@
       "source": [
         "\t\tif displayType == access {"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/cache.go:674. Existing conditional chain could use a tagged switch; optional syntax cleanup."
+      "reason": "Existing conditional chain could use a tagged switch; optional syntax cleanup."
     },
     {
       "linter": "staticcheck",
@@ -906,7 +906,7 @@
       "source": [
         "\t\treturn fmt.Errorf(\"A connection for cluster named %s already exists with url=%s and type=%s\","
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/cluster.go:1725. Existing error capitalization/punctuation style; error handling remains enforced."
+      "reason": "Existing error capitalization/punctuation style; error handling remains enforced."
     },
     {
       "linter": "staticcheck",
@@ -915,7 +915,7 @@
       "source": [
         "\t\tsb.WriteString(fmt.Sprintf(\"implementation '%s:%s:%s'\\n\", v.GroupID, v.Artifact, v.Version))"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/cluster_utils.go:153. Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
+      "reason": "Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
     },
     {
       "linter": "staticcheck",
@@ -924,7 +924,7 @@
       "source": [
         "\t\tif value == on {"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/color.go:36. Existing conditional chain could use a tagged switch; optional syntax cleanup."
+      "reason": "Existing conditional chain could use a tagged switch; optional syntax cleanup."
     },
     {
       "linter": "staticcheck",
@@ -933,7 +933,7 @@
       "source": [
         "\t\tif value == on {"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/debug.go:39. Existing conditional chain could use a tagged switch; optional syntax cleanup."
+      "reason": "Existing conditional chain could use a tagged switch; optional syntax cleanup."
     },
     {
       "linter": "staticcheck",
@@ -942,7 +942,7 @@
       "source": [
         "\t\tif journalType == ram {"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/elastic_data.go:246. Existing conditional chain could use a tagged switch; optional syntax cleanup."
+      "reason": "Existing conditional chain could use a tagged switch; optional syntax cleanup."
     },
     {
       "linter": "staticcheck",
@@ -951,7 +951,7 @@
       "source": [
         "\t\tif journalType == ram {"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/elastic_data.go:152. Existing conditional chain could use a tagged switch; optional syntax cleanup."
+      "reason": "Existing conditional chain could use a tagged switch; optional syntax cleanup."
     },
     {
       "linter": "staticcheck",
@@ -960,7 +960,7 @@
       "source": [
         "\t\tif args[0] == destinations {"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/federation.go:66. Existing conditional chain could use a tagged switch; optional syntax cleanup."
+      "reason": "Existing conditional chain could use a tagged switch; optional syntax cleanup."
     },
     {
       "linter": "staticcheck",
@@ -969,7 +969,7 @@
       "source": [
         "\t\tsb.WriteString(fmt.Sprintf(\"Service:     %s\\n\", serviceName))"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/federation.go:359. Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
+      "reason": "Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
     },
     {
       "linter": "staticcheck",
@@ -978,7 +978,7 @@
       "source": [
         "\tsb.WriteString(fmt.Sprintf(\"Type:        %s\\n\", federationType))"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/federation.go:488. Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
+      "reason": "Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
     },
     {
       "linter": "staticcheck",
@@ -987,7 +987,7 @@
       "source": [
         "\tsb.WriteString(fmt.Sprintf(\"Participant: %s\\n\\n\", participantName))"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/federation.go:363. Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
+      "reason": "Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
     },
     {
       "linter": "staticcheck",
@@ -996,7 +996,7 @@
       "source": [
         "\t\tsb.WriteString(fmt.Sprintf(\"Service:     %s\\n\", service))"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/federation.go:485. Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
+      "reason": "Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1005,7 +1005,7 @@
       "source": [
         "\tsb.WriteString(fmt.Sprintf(\"Type:        %s\\n\", federationType))"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/federation.go:362. Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
+      "reason": "Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1014,7 +1014,7 @@
       "source": [
         "\tsb.WriteString(fmt.Sprintf(\"Participant: %s\\n\", participantName))"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/federation.go:489. Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
+      "reason": "Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1023,7 +1023,7 @@
       "source": [
         "\tsb.WriteString(fmt.Sprintf(\"Cluster Name:       %s\\n\", cluster.ClusterName))"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/formatting.go:104. Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
+      "reason": "Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1032,7 +1032,7 @@
       "source": [
         "\tsb.WriteString(fmt.Sprintf(\"Version:            %s\\n\", cluster.Version))"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/formatting.go:105. Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
+      "reason": "Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1041,7 +1041,7 @@
       "source": [
         "\tsb.WriteString(fmt.Sprintf(\"Cluster TotalSize:  %d\\n\", cluster.ClusterSize))"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/formatting.go:106. Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
+      "reason": "Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1050,7 +1050,7 @@
       "source": [
         "\tsb.WriteString(fmt.Sprintf(\"License Mode:       %s\\n\", cluster.LicenseMode))"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/formatting.go:107. Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
+      "reason": "Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1059,7 +1059,7 @@
       "source": [
         "\tsb.WriteString(fmt.Sprintf(\"Departure Count:    %d\\n\", cluster.MembersDepartureCount))"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/formatting.go:108. Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
+      "reason": "Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1068,7 +1068,7 @@
       "source": [
         "\tsb.WriteString(fmt.Sprintf(\"Running:            %v\\n\", cluster.Running))"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/formatting.go:109. Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
+      "reason": "Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1077,7 +1077,7 @@
       "source": [
         "\t\tif \"Durable\" == value.SubType {"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/formatting.go:696. Existing reversed equality operands; expression style only."
+      "reason": "Existing reversed equality operands; expression style only."
     },
     {
       "linter": "staticcheck",
@@ -1086,7 +1086,7 @@
       "source": [
         "\t\t\t\tsb.WriteString(fmt.Sprintf(format, node, v))"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/formatting.go:1002. Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
+      "reason": "Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1095,7 +1095,7 @@
       "source": [
         "\t\t\t\tsb.WriteString(fmt.Sprintf(keyFormat, v.Key, str))"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/formatting.go:2389. Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
+      "reason": "Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1104,7 +1104,7 @@
       "source": [
         "\t\t\t\tsb.WriteString(fmt.Sprintf(keyFormat, \"\", str))"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/formatting.go:2391. Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
+      "reason": "Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1113,7 +1113,7 @@
       "source": [
         "\t\tsb.WriteString(fmt.Sprintf(keyFormat, v.Key, value))"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/formatting.go:2395. Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
+      "reason": "Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1122,7 +1122,7 @@
       "source": [
         "\t\t\t\t\t\tsb2.WriteString(fmt.Sprintf(\"... output truncated, %v more line(s)\", remainingLines))"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/formatting.go:2593. Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
+      "reason": "Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1131,7 +1131,7 @@
       "source": [
         "\t\t\t\tresult = strings.Replace(result, \" \", \"\", -1)"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/health.go:264. Existing strings.Replace with count -1 could use ReplaceAll; optional syntax cleanup."
+      "reason": "Existing strings.Replace with count -1 could use ReplaceAll; optional syntax cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1140,7 +1140,7 @@
       "source": [
         "\t\tif value == stringTrue {"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/ingore_certs.go:60. Existing conditional chain could use a tagged switch; optional syntax cleanup."
+      "reason": "Existing conditional chain could use a tagged switch; optional syntax cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1149,7 +1149,7 @@
       "source": [
         "\t\tif operation == fetcher.StopJFR {"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/jfr.go:282. Existing conditional chain could use a tagged switch; optional syntax cleanup."
+      "reason": "Existing conditional chain could use a tagged switch; optional syntax cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1158,7 +1158,7 @@
       "source": [
         "\t\tfinalResult = strings.Replace(strings.Replace(result, \"\\n\\n\", \"\\n\", -1), \"->\", \"->\\n\", -1)"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/jfr.go:347. Existing strings.Replace with count -1 could use ReplaceAll; optional syntax cleanup."
+      "reason": "Existing strings.Replace with count -1 could use ReplaceAll; optional syntax cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1167,7 +1167,7 @@
       "source": [
         "\t\tfinalResult = strings.Replace(strings.Replace(result, \"\\n\\n\", \"\\n\", -1), \"->\", \"->\\n\", -1)"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/jfr.go:347. Existing strings.Replace with count -1 could use ReplaceAll; optional syntax cleanup."
+      "reason": "Existing strings.Replace with count -1 could use ReplaceAll; optional syntax cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1176,7 +1176,7 @@
       "source": [
         "\t\t\tsb.WriteString(fmt.Sprintf(\"Viewing Node Id:     %s\\n\", member.NodeID))"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/member.go:363. Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
+      "reason": "Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1185,7 +1185,7 @@
       "source": [
         "\t\t\tsb.WriteString(fmt.Sprintf(\"Viewing Member Name: %s\\n\\n\", member.MemberName))"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/member.go:364. Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
+      "reason": "Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1194,7 +1194,7 @@
       "source": [
         "\tif command == dumpClusterHeap {"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/member.go:909. Existing conditional chain could use a tagged switch; optional syntax cleanup."
+      "reason": "Existing conditional chain could use a tagged switch; optional syntax cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1203,7 +1203,7 @@
       "source": [
         "\tif displayType == access {"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/monitor_cluster.go:1281. Existing conditional chain could use a tagged switch; optional syntax cleanup."
+      "reason": "Existing conditional chain could use a tagged switch; optional syntax cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1212,7 +1212,7 @@
       "source": [
         "\t\tsb.WriteString(fmt.Sprintf(\"%-25s: %s\\n\", k, v))"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/monitor_cluster.go:1741. Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
+      "reason": "Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1221,7 +1221,7 @@
       "source": [
         "\t\tsb.WriteString(fmt.Sprintf(\"%-25s: %s\\n\", p.GetPanelName(), p.GetDescription()))"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/monitor_cluster.go:1746. Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
+      "reason": "Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1392,7 +1392,7 @@
       "source": [
         "\tif operation == fetcher.ResetCache {"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/reset_stats.go:229. Existing conditional chain could use a tagged switch; optional syntax cleanup."
+      "reason": "Existing conditional chain could use a tagged switch; optional syntax cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1401,7 +1401,7 @@
       "source": [
         "\t\tif value.AppID == \"app1\" {"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/root_test.go:365. Existing conditional chain could use a tagged switch; optional syntax cleanup."
+      "reason": "Existing conditional chain could use a tagged switch; optional syntax cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1410,7 +1410,7 @@
       "source": [
         "\t\t\tif operation == fetcher.RemoveSnapshot {"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/snapshot.go:371. Existing conditional chain could use a tagged switch; optional syntax cleanup."
+      "reason": "Existing conditional chain could use a tagged switch; optional syntax cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1419,7 +1419,7 @@
       "source": [
         "\t\t\t\tsb.WriteString(fmt.Sprintf(\"Service:      %s\\n\", serviceName))"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/topics.go:576. Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
+      "reason": "Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1428,7 +1428,7 @@
       "source": [
         "\t\t\t\tsb.WriteString(fmt.Sprintf(\"Topic:        %s\\n\", topicNameChannels))"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/topics.go:577. Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
+      "reason": "Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1437,7 +1437,7 @@
       "source": [
         "\t\t\t\tsb.WriteString(fmt.Sprintf(\"Node ID:      %d\\n\", topicsNodeID))"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/topics.go:578. Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
+      "reason": "Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1446,7 +1446,7 @@
       "source": [
         "\t\t\t\tsb.WriteString(fmt.Sprintf(\"ChannelCount: %d\\n\\n\", numChannels))"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/topics.go:579. Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
+      "reason": "Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1455,7 +1455,7 @@
       "source": [
         "\t\t\t\tsb.WriteString(fmt.Sprintf(\"Service:          %s\\n\", serviceName))"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/topics.go:989. Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
+      "reason": "Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1464,7 +1464,7 @@
       "source": [
         "\t\t\t\tsb.WriteString(fmt.Sprintf(\"Topic:            %s\\n\", topicName))"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/topics.go:990. Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
+      "reason": "Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1473,7 +1473,7 @@
       "source": [
         "\t\t\t\tsb.WriteString(fmt.Sprintf(\"Node ID:          %d\\n\", topicsNodeID))"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/topics.go:991. Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
+      "reason": "Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1482,7 +1482,7 @@
       "source": [
         "\t\t\t\tsb.WriteString(fmt.Sprintf(\"ChannelCount:     %d\\n\", numChannels))"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/topics.go:992. Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
+      "reason": "Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1491,7 +1491,7 @@
       "source": [
         "\t\t\t\tsb.WriteString(fmt.Sprintf(\"Subscriber Group: %d\\n\\n\", subscriber))"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/topics.go:672. Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
+      "reason": "Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1500,7 +1500,7 @@
       "source": [
         "\t\t\t\tsb.WriteString(fmt.Sprintf(\"Service:          %s\\n\", serviceName))"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/topics.go:668. Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
+      "reason": "Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1509,7 +1509,7 @@
       "source": [
         "\t\t\t\tsb.WriteString(fmt.Sprintf(\"Topic:            %s\\n\", topicName))"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/topics.go:669. Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
+      "reason": "Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1518,7 +1518,7 @@
       "source": [
         "\t\t\t\tsb.WriteString(fmt.Sprintf(\"Node ID:          %d\\n\", topicsNodeID))"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/topics.go:670. Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
+      "reason": "Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1527,7 +1527,7 @@
       "source": [
         "\t\t\t\tsb.WriteString(fmt.Sprintf(\"ChannelCount:     %d\\n\", numChannels))"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/topics.go:671. Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
+      "reason": "Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1536,7 +1536,7 @@
       "source": [
         "\t\t\t\tsb.WriteString(fmt.Sprintf(\"Subscriber Group: %s\\n\\n\", subscriberGroup))"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/topics.go:993. Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
+      "reason": "Existing WriteString(fmt.Sprintf(...)) could use fmt.Fprintf; optional output construction cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1545,7 +1545,7 @@
       "source": [
         "\t\tif value == stringTrue {"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/cmd/use-gradle.go:36. Existing conditional chain could use a tagged switch; optional syntax cleanup."
+      "reason": "Existing conditional chain could use a tagged switch; optional syntax cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1554,7 +1554,7 @@
       "source": [
         "\t\tif mode == WithSync {"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/fetcher/http_fetcher.go:820. Existing conditional chain could use a tagged switch; optional syntax cleanup."
+      "reason": "Existing conditional chain could use a tagged switch; optional syntax cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1563,7 +1563,7 @@
       "source": [
         "\tif operation == SuspendService {"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/fetcher/http_fetcher.go:847. Existing conditional chain could use a tagged switch; optional syntax cleanup."
+      "reason": "Existing conditional chain could use a tagged switch; optional syntax cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1572,7 +1572,7 @@
       "source": [
         "\tif operation == ResetMembers {"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/fetcher/http_fetcher.go:870. Existing conditional chain could use a tagged switch; optional syntax cleanup."
+      "reason": "Existing conditional chain could use a tagged switch; optional syntax cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1581,7 +1581,7 @@
       "source": [
         "\tif operation == CreateSnapshot {"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/fetcher/http_fetcher.go:943. Existing conditional chain could use a tagged switch; optional syntax cleanup."
+      "reason": "Existing conditional chain could use a tagged switch; optional syntax cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1590,7 +1590,7 @@
       "source": [
         "\tif operation == RemainingMessages {"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/fetcher/http_fetcher.go:1093. Existing conditional chain could use a tagged switch; optional syntax cleanup."
+      "reason": "Existing conditional chain could use a tagged switch; optional syntax cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1599,7 +1599,7 @@
       "source": [
         "\tif jfrType == JfrTypeRole {"
       ],
-      "reason": "Inherited at 9cef46ae980c:pkg/fetcher/http_fetcher.go:1140. Existing conditional chain could use a tagged switch; optional syntax cleanup."
+      "reason": "Existing conditional chain could use a tagged switch; optional syntax cleanup."
     },
     {
       "linter": "staticcheck",
@@ -1608,7 +1608,7 @@
       "source": [
         "\t. \"github.com/onsi/gomega\""
       ],
-      "reason": "Inherited at 9cef46ae980c:test/common/common.go:12. Existing Gomega assertion dot import; import style only."
+      "reason": "Existing Gomega assertion dot import; import style only."
     },
     {
       "linter": "staticcheck",
@@ -1617,7 +1617,7 @@
       "source": [
         "\tvar re1 = regexp.MustCompile(\"^((.|\\\\n)*)server1\")"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/common/common.go:635. Existing regexp literal could use raw-string syntax; spelling cleanup only."
+      "reason": "Existing regexp literal could use raw-string syntax; spelling cleanup only."
     },
     {
       "linter": "staticcheck",
@@ -1626,7 +1626,7 @@
       "source": [
         "\tvar re2 = regexp.MustCompile(\" ((.|\\\\n)*)\")"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/common/common.go:636. Existing regexp literal could use raw-string syntax; spelling cleanup only."
+      "reason": "Existing regexp literal could use raw-string syntax; spelling cleanup only."
     },
     {
       "linter": "staticcheck",
@@ -1635,7 +1635,7 @@
       "source": [
         "\t. \"github.com/onsi/gomega\""
       ],
-      "reason": "Inherited at 9cef46ae980c:test/test_utils/test_utils.go:15. Existing Gomega assertion dot import; import style only."
+      "reason": "Existing Gomega assertion dot import; import style only."
     },
     {
       "linter": "staticcheck",
@@ -1644,7 +1644,7 @@
       "source": [
         "\tt.Log(fmt.Sprintf(\"Starting docker image %s with image name %s, httpPort %d and clusterName %s\","
       ],
-      "reason": "Inherited at 9cef46ae980c:test/test_utils/test_utils.go:289. Existing t.Log(fmt.Sprintf(...)) could use t.Logf; fixture logging style only."
+      "reason": "Existing t.Log(fmt.Sprintf(...)) could use t.Logf; fixture logging style only."
     },
     {
       "linter": "staticcheck",
@@ -1653,7 +1653,7 @@
       "source": [
         "\treturn fmt.Errorf(\"Unable to connect to url %s after %d seconds\\n\", url, timeout)"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/test_utils/test_utils.go:425. Existing error capitalization/punctuation style; error handling remains enforced."
+      "reason": "Existing error capitalization/punctuation style; error handling remains enforced."
     },
     {
       "linter": "staticcheck",
@@ -1662,7 +1662,7 @@
       "source": [
         "\treturn fmt.Errorf(\"Unable to connect to url %s after %d seconds\\n\", url, timeout)"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/test_utils/test_utils.go:425. Existing error capitalization/punctuation style; error handling remains enforced."
+      "reason": "Existing error capitalization/punctuation style; error handling remains enforced."
     },
     {
       "linter": "staticcheck",
@@ -1671,7 +1671,7 @@
       "source": [
         "\treturn fmt.Errorf(\"Unable to connect to url %s after %d seconds\\n\", url, timeout)"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/test_utils/test_utils.go:399. Existing error capitalization/punctuation style; error handling remains enforced."
+      "reason": "Existing error capitalization/punctuation style; error handling remains enforced."
     },
     {
       "linter": "staticcheck",
@@ -1680,7 +1680,7 @@
       "source": [
         "\treturn fmt.Errorf(\"Unable to connect to url %s after %d seconds\\n\", url, timeout)"
       ],
-      "reason": "Inherited at 9cef46ae980c:test/test_utils/test_utils.go:399. Existing error capitalization/punctuation style; error handling remains enforced."
+      "reason": "Existing error capitalization/punctuation style; error handling remains enforced."
     },
     {
       "linter": "staticcheck",
@@ -1689,7 +1689,7 @@
       "source": [
         "\treturn fmt.Errorf(\"Unable to get to idle for service %s after %d seconds. Last status %s\","
       ],
-      "reason": "Inherited at 9cef46ae980c:test/test_utils/test_utils.go:460. Existing error capitalization/punctuation style; error handling remains enforced."
+      "reason": "Existing error capitalization/punctuation style; error handling remains enforced."
     }
   ]
 }

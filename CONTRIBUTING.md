@@ -60,6 +60,38 @@ deferral. Review baseline or tool-version changes against that report and rerun
 `make golangci` to verify the retained occurrences. For workflow edits, also run
 `actionlint` on the changed workflow files.
 
+### Local management tests
+
+Run the management harness regressions without a cluster:
+
+```bash
+make test-local-management-support
+```
+
+These tests cover REST membership convergence, exact member/PID identity and
+listener bind validation. The ordinary CI workflow runs this target.
+
+For real cluster integration, run `make cohctl` followed by
+`make test-create-cluster COHERENCE_VERSION=14.1.2-0-5`. This includes
+`scripts/test-local-management.py`, which checks REST/JMX listener addresses,
+JVM identity, lifecycle operations and cleanup. It requires Java, `javac`, Maven,
+the existing Gradle test setup, and `lsof` on Unix or PowerShell on Windows.
+The management harness uses cached Coherence dependencies and a real local
+network interface for its positive TCP control.
+
+On native Windows, with Go, Python 3, PowerShell and GNU Make/Bash available, run:
+
+```bash
+make test-windows-console
+```
+
+This target builds the CLI and the `scripts/fixtures/windows-console` controller,
+runs the controller unit tests, and exercises real Ctrl-C/Ctrl-Break cancellation.
+The fixture supplies Java-shaped processes and REST responses. Results are
+written to `build/_output/test-logs/windows-console.json`; per-case temporary
+directories are removed by the driver. Cross-compilation alone does not execute
+these Windows tests.
+
 ## Pull request process
 
 1. Ensure there is an issue created to track and discuss the fix or enhancement

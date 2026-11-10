@@ -19,7 +19,7 @@ import (
 // Exercise main with the actual unsuffixed argv[0] that Go gives a resolved
 // mvn.exe, rather than merely testing a name-comparison helper.
 func TestMavenInvocation(t *testing.T) {
-	if os.Getenv("F1_WINDOWS_MAVEN_CHILD") == "1" {
+	if os.Getenv("COHCTL_WINDOWS_MAVEN_CHILD") == "1" {
 		main()
 		return
 	}
@@ -34,7 +34,7 @@ func TestMavenInvocation(t *testing.T) {
 			defer cancel()
 			child := exec.CommandContext(ctx, self, "-test.run=^TestMavenInvocation$")
 			child.Args[0] = name
-			child.Env = append(os.Environ(), "F1_WINDOWS_MAVEN_CHILD=1", "COHCTL_WINDOWS_FIXTURE="+dir)
+			child.Env = append(os.Environ(), "COHCTL_WINDOWS_MAVEN_CHILD=1", "COHCTL_WINDOWS_FIXTURE="+dir)
 			output, err := child.CombinedOutput() // This command alone owns Wait.
 			if err != nil || ctx.Err() != nil {
 				t.Fatalf("Maven shim failed or required rescue: %v, %v, %s", err, ctx.Err(), output)
