@@ -3,7 +3,7 @@
 # Licensed under the Universal Permissive License v 1.0 as shown at
 # https://oss.oracle.com/licenses/upl.
 
-"""Local F1 runtime gate. Requires java/javac, cached Maven dependencies and lsof.
+"""Local management integration tests. Requires java/javac, cached Maven dependencies and lsof.
 
 Uses task-owned config/JVMs, local REST/JMX success, PID-owned listener inspection,
 and negative probes through a real host interface with a positive TCP control.
@@ -12,8 +12,8 @@ This is same-host evidence; second-host and insecure-remote qualification are se
 
 import argparse
 import base64
+from functools import partial
 from datetime import datetime, timezone
-import hashlib
 import json
 import os
 from pathlib import Path
@@ -29,7 +29,7 @@ import urllib.request
 import uuid
 import shlex
 
-import f1_platform as native
+import management_platform as native
 
 
 def wait_for_rest_membership(expected, endpoints, read_members, timeout=30, poll_interval=.1):
@@ -59,6 +59,95 @@ def wait_for_rest_membership(expected, endpoints, read_members, timeout=30, poll
                        json.dumps({"expected": expected, "endpoints": last}, sort_keys=True))
 
 
+
+def inspect(label, expected_http, with_jmx, bind_address="127.0.0.1", *,
+            marker, config, interface, jmx, probe_classpath, members, request,
+            connect, marked_processes, observer_lock, linux_identities, evidence,
+            platform=native):
+    """Inspect one run using exact membership and PID-owned listener evidence."""
+    remote = bind_address != "127.0.0.1"
+    current, snapshots, rest, rest_identity = {}, [], {}, {}
+    # REST can accept requests before its membership view has converged.
+    # Obtain expected identities from the marked JVMs rather than an
+    # arbitrarily early REST response, including from the primary.
+    for pid in platform.processes(marker):
+        snapshot = platform.snapshot(pid)
+        process_args = snapshot["command"]
+        tokens = [word.strip('"') for word in shlex.split(process_args, posix=os.name != "nt")]
+        assert f"-Dcoherence.cluster={marker}" in tokens, "cluster PID identity mismatch"
+        names = [word.removeprefix("-Dcoherence.member=") for word in tokens if word.startswith("-Dcoherence.member=")]
+        assert len(names) == 1 and names[0] and names[0] not in current, "member PID identity mismatch"
+        member = names[0]
+        current[member] = pid
+        addresses = snapshot["listeners"]
+        snapshot["member"] = member
+        snapshots.append(snapshot)
+        state = snapshot.get("linux_process_identity")
+        if state:
+            with observer_lock:
+                linux_identities.setdefault(f"{pid}:{state['start_ticks']}", state)
+        # The Coherence log names each selected management HTTP acceptor.
+        log = (config / "logs" / marker / (member + ".log")).read_text()
+        ports = set(map(int, re.findall(r"HttpAcceptor now listening for connections on [^\n]*?:(\d+)", log)))
+        for port in ports:
+            # Logs can retain entries from an earlier incarnation. Only a
+            # socket owned by this current member can supply evidence.
+            if not any(address.rsplit(":", 1)[-1] == str(port) for address in addresses):
+                continue
+            # Health endpoints may share HttpAcceptor logs; only count Management REST.
+            try:
+                data = request(port)
+            except (OSError, ValueError):
+                continue
+            if data.get("clusterName") != marker:
+                continue
+            assert member not in rest, ("multiple Management REST listeners on one member", member)
+            rest[member] = port
+            rest_identity[member] = {"owner_pid": pid, "cluster_name": data["clusterName"]}
+    assert current and set(current.values()) == marked_processes(), "REST snapshot differs from current test-owned processes"
+    assert len(rest) == expected_http, (label, "REST listener count", rest, snapshots)
+    wait_for_rest_membership(current, rest, members)
+    for snapshot in snapshots:
+        fresh = platform.snapshot(snapshot["pid"])
+        assert fresh["command"] == snapshot["command"] and fresh.get("started") == snapshot.get("started"), "member process changed during REST readiness"
+        snapshot.update(fresh)
+        member = snapshot["member"]
+        if member not in rest:
+            continue
+        port = rest[member]
+        platform.assert_listener_bind(snapshot["listeners"], port, bind_address)
+        observed = members(port)
+        assert observed == current, ("REST endpoint member/PID identity mismatch", member, port, observed, current)
+        assert connect(interface, port) == remote, ("unexpected interface REST reachability", port)
+        rest_identity[member]["members"] = observed
+    if with_jmx:
+        owner = current["storage-0"]
+        sockets = [s for s in snapshots if any(a.rsplit(":", 1)[-1] == str(jmx) for a in s["listeners"])]
+        assert len(sockets) == 1 and sockets[0]["pid"] == owner, sockets
+        platform.assert_listener_bind(sockets[0]["listeners"], jmx, bind_address)
+        output = subprocess.check_output(["java", "-cp", str(probe_classpath), "ManagementProbe", "127.0.0.1", str(jmx), str(owner)], text=True, timeout=15)
+        assert connect(interface, jmx) == remote, "unexpected interface JMX registry/RMI reachability"
+        assert "endpoint:[" in output and f":{jmx}]" in output, "actual RMI endpoint not identified"
+    else:
+        output = "JMX disabled"
+        for snapshot in snapshots:
+            assert "com.sun.management.jmxremote" not in snapshot["command"]
+            assert not any(address.rsplit(":", 1)[-1] == str(jmx) for address in snapshot["listeners"]), snapshot
+        assert not connect("127.0.0.1", jmx), "disabled JMX port still accepts loopback connections"
+        assert not connect(interface, jmx), "disabled JMX port still accepts interface connections"
+    assert members() == current and marked_processes() == set(current.values()), "members changed during socket inspection"
+    record = {"case": label, "result": "PASS", "members": current, "rest": rest, "rest_identity": rest_identity,
+              "sockets": snapshots, "jmx": output.strip(), "jmx_port_closed": not with_jmx,
+              "nonloopback_probes": "all selected REST and JMX reachable" if remote else "all selected REST and JMX failed"}
+    with socket.socket() as control:
+        control.bind((interface, 0)); control.listen(1)
+        assert connect(interface, control.getsockname()[1]), "same-case positive interface control failed"
+        record["positive_control"] = f"{interface}:{control.getsockname()[1]}"
+    evidence["checks"].append(record)
+    print(label, "PASS", rest, output.strip(), flush=True)
+    return record
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("version")
@@ -73,7 +162,6 @@ def main():
     parser.add_argument("--cluster-port", type=int, help="assigned fixed NameService/cluster test port")
     parser.add_argument("--jmx-port", type=int, help="assigned fixed registry/RMI test port")
     parser.add_argument("--initialize-config", action="store_true", help="run version first as an explicit initialized-configuration control")
-    parser.add_argument("--peer-config", type=Path, help="assigned isolated peer JSON: argv, scope, resource description")
     args = parser.parse_args()
     assigned_ports = [port for port in (args.rest_port, args.cluster_port, args.jmx_port) if port is not None]
     if any(not 0 < port < 65536 for port in assigned_ports) or len(assigned_ports) != len(set(assigned_ports)):
@@ -83,19 +171,15 @@ def main():
         raise RuntimeError("MISSING COVERAGE: java and javac are required")
     root = Path(__file__).resolve().parent.parent
     cli = str(Path(args.cli).resolve())
-    base = args.scratch_dir or Path("/private/tmp/codex-work" if Path("/private/tmp").exists() else tempfile.gettempdir())
+    base = args.scratch_dir or Path(tempfile.gettempdir())
     base.mkdir(parents=True, exist_ok=True)
     evidence = {"version": args.version, "platform": native.identity(),
                 "started_at": datetime.now(timezone.utc).isoformat(), "status": "RUNNING",
                 "java": subprocess.check_output(["java", "-version"], stderr=subprocess.STDOUT, text=True).strip(),
-                "cli_sha256": hashlib.sha256(Path(cli).read_bytes()).hexdigest(),
-                "harness_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-                "probe_sha256": hashlib.sha256((root / "scripts" / "ManagementProbe.java").read_bytes()).hexdigest(),
-                "topology": "same host, real non-loopback interface; no second-host test", "checks": [], "commands": [],
-                "adapter_sha256": hashlib.sha256((root / "scripts" / "f1_platform.py").read_bytes()).hexdigest()}
+                "topology": "same host, real non-loopback interface; no second-host test", "checks": [], "commands": []}
     evidence["requested_fixed_ports"] = {"rest": args.rest_port, "cluster": args.cluster_port, "jmx": args.jmx_port}
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-    marker = "f1-" + uuid.uuid4().hex[:12]
+    marker = "management-test-" + uuid.uuid4().hex[:12]
     evidence["cluster_name"] = marker
 
     local_host = "127.0.0.1"
@@ -139,7 +223,7 @@ def main():
     evidence["interface"] = interface
     evidence["positive_tcp_control"] = True
 
-    with tempfile.TemporaryDirectory(prefix="f1-management-", dir=base) as temp:
+    with tempfile.TemporaryDirectory(prefix="management-test-", dir=base) as temp:
         config = Path(temp) / "config"
         config.mkdir()
         reserved = set(assigned_ports)
@@ -184,7 +268,7 @@ def main():
             evidence["commands"].append({"argv": [cli, "--config-dir", str(config), *map(str, words)],
                                          "exit_code": result.returncode, "expected_success": success,
                                          "elapsed_seconds": time.monotonic() - started,
-                                         "stdout_sha256": hashlib.sha256(result.stdout.encode()).hexdigest(), "stdout": result.stdout})
+                                         "stdout": result.stdout})
             print("cohctl", *words, flush=True)
             if (result.returncode == 0) != success:
                 raise AssertionError(result.stdout)
@@ -200,105 +284,15 @@ def main():
         def marked_processes():
             return set(native.processes(marker))
 
-        peer = None
 
-        def set_host(host):
-            nonlocal local_host
-            local_host = host
-
-        def inspect(label, expected_http, with_jmx, bind_address="127.0.0.1"):
-            remote = bind_address != "127.0.0.1"
-            current, snapshots, rest, rest_identity = {}, [], {}, {}
-            # REST can accept requests before its membership view has converged.
-            # Obtain expected identities from the marked JVMs rather than an
-            # arbitrarily early REST response, including from the primary.
-            for pid in native.processes(marker):
-                snapshot = native.snapshot(pid)
-                process_args = snapshot["command"]
-                tokens = [word.strip('"') for word in shlex.split(process_args, posix=os.name != "nt")]
-                assert f"-Dcoherence.cluster={marker}" in tokens, "cluster PID identity mismatch"
-                names = [word.removeprefix("-Dcoherence.member=") for word in tokens if word.startswith("-Dcoherence.member=")]
-                assert len(names) == 1 and names[0] and names[0] not in current, "member PID identity mismatch"
-                member = names[0]
-                current[member] = pid
-                addresses = snapshot["listeners"]
-                snapshot["member"] = member
-                snapshots.append(snapshot)
-                state = snapshot.get("linux_process_identity")
-                if state:
-                    with observer_lock:
-                        linux_identities.setdefault(f"{pid}:{state['start_ticks']}", state)
-                classpath = tokens[tokens.index("-cp") + 1]
-                snapshot["classpath"] = [{"path": item, "sha256": hashlib.sha256(Path(item).read_bytes()).hexdigest()}
-                                         for item in classpath.split(os.pathsep)]
-                # The Coherence log names each selected management HTTP acceptor.
-                log = (config / "logs" / marker / (member + ".log")).read_text()
-                ports = set(map(int, re.findall(r"HttpAcceptor now listening for connections on [^\n]*?:(\d+)", log)))
-                for port in ports:
-                    # Logs can retain entries from an earlier incarnation. Only a
-                    # socket owned by this current member can supply evidence.
-                    if not any(address.rsplit(":", 1)[-1] == str(port) for address in addresses):
-                        continue
-                    # Health endpoints may share HttpAcceptor logs; only count Management REST.
-                    try:
-                        data = request(port)
-                    except (OSError, ValueError):
-                        continue
-                    if data.get("clusterName") != marker:
-                        continue
-                    assert member not in rest, ("multiple Management REST listeners on one member", member)
-                    rest[member] = port
-                    rest_identity[member] = {"owner_pid": pid, "cluster_name": data["clusterName"]}
-            assert current and set(current.values()) == marked_processes(), "REST snapshot differs from current test-owned processes"
-            assert len(rest) == expected_http, (label, "REST listener count", rest, snapshots)
-            wait_for_rest_membership(current, rest, members)
-            for snapshot in snapshots:
-                fresh = native.snapshot(snapshot["pid"])
-                assert fresh["command"] == snapshot["command"] and fresh.get("started") == snapshot.get("started"), "member process changed during REST readiness"
-                snapshot.update(fresh)
-                member = snapshot["member"]
-                if member not in rest:
-                    continue
-                port = rest[member]
-                native.assert_listener_bind(snapshot["listeners"], port, bind_address)
-                observed = members(port)
-                assert observed == current, ("REST endpoint member/PID identity mismatch", member, port, observed, current)
-                assert connect(interface, port) == remote, ("unexpected interface REST reachability", port)
-                rest_identity[member]["members"] = observed
-            if with_jmx:
-                owner = current["storage-0"]
-                sockets = [s for s in snapshots if any(a.rsplit(":", 1)[-1] == str(jmx) for a in s["listeners"])]
-                assert len(sockets) == 1 and sockets[0]["pid"] == owner, sockets
-                native.assert_listener_bind(sockets[0]["listeners"], jmx, bind_address)
-                output = subprocess.check_output(["java", "-cp", temp, "ManagementProbe", local_host, str(jmx), str(owner)], text=True, timeout=15)
-                assert connect(interface, jmx) == remote, "unexpected interface JMX registry/RMI reachability"
-                assert "endpoint:[" in output and f":{jmx}]" in output, "actual RMI endpoint not identified"
-            else:
-                output = "JMX disabled"
-                for snapshot in snapshots:
-                    assert "com.sun.management.jmxremote" not in snapshot["command"]
-                    assert not any(address.rsplit(":", 1)[-1] == str(jmx) for address in snapshot["listeners"]), snapshot
-                assert not connect("127.0.0.1", jmx), "disabled JMX port still accepts loopback connections"
-                assert not connect(interface, jmx), "disabled JMX port still accepts interface connections"
-            assert members() == current and marked_processes() == set(current.values()), "members changed during socket inspection"
-            record = {"case": label, "result": "PASS", "members": current, "rest": rest, "rest_identity": rest_identity,
-                      "sockets": snapshots, "jmx": output.strip(), "jmx_port_closed": not with_jmx,
-                      "nonloopback_probes": "all selected REST and JMX reachable" if remote else "all selected REST and JMX failed"}
-            with socket.socket() as control:
-                control.bind((interface, 0)); control.listen(1)
-                assert connect(interface, control.getsockname()[1]), "same-case positive interface control failed"
-                record["positive_control"] = f"{interface}:{control.getsockname()[1]}"
-            if peer:
-                peer.check(record, jmx)
-            evidence["checks"].append(record)
-            print(label, "PASS", rest, output.strip(), flush=True)
-            return record
+        inspect_run = partial(inspect, marker=marker, config=config, interface=interface,
+                              jmx=jmx, probe_classpath=temp, members=members, request=request,
+                              connect=connect, marked_processes=marked_processes,
+                              observer_lock=observer_lock, linux_identities=linux_identities,
+                              evidence=evidence)
 
         try:
             subprocess.run(["javac", "-d", temp, str(root / "scripts" / "ManagementProbe.java")], check=True)
-            if args.peer_config:
-                from f1_remote import Peer
-                peer = Peer(args.peer_config, interface, evidence)
             create = ["create", "cluster", marker, "-y", "-I", "-v", args.version, "-r", 2, "-H", http, "-p", cluster]
             if args.download_deps:
                 create.remove("-I")
@@ -308,15 +302,15 @@ def main():
                 command("version")
                 evidence["configuration_preinitialized"] = True
             command(*create)
-            inspect("default create", 1, False)
+            inspect_run("default create", 1, False)
             assert marker in command("nslookup", f"127.0.0.1:{cluster}", "-q", "Cluster/name")
             assert "127.0.0.1" in command("nslookup", f"127.0.0.1:{cluster}", "-q", "NameService/string/management/HTTPManagementURL")
             command("get", "members", "-c", f"127.0.0.1:{cluster}")
             evidence["name_service_discovery"] = "PASS"
             if args.monitor:
                 fixture = Path(temp) / "monitor.expect"
-                fixture.write_text((root / "scripts" / "monitor.expect").read_text().replace("monitor cluster local", "monitor cluster $env(F1_CLUSTER)"))
-                environment = dict(os.environ, DIR=str(root), CONFIG_DIR=str(config), F1_CLUSTER=marker)
+                fixture.write_text((root / "scripts" / "monitor.expect").read_text().replace("monitor cluster local", "monitor cluster $env(COHCTL_TEST_CLUSTER)"))
+                environment = dict(os.environ, DIR=str(root), CONFIG_DIR=str(config), COHCTL_TEST_CLUSTER=marker)
                 result = subprocess.run(["expect", "-f", str(fixture)], env=environment, text=True,
                                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=30)
                 assert result.returncode == 0 and "Coherence CLI" in result.stdout, result.stdout
@@ -327,23 +321,23 @@ def main():
             command("stop", "cluster", marker, "-y", env=no_java)
             command("remove", "cluster", marker, "-y")
             command(*create, "-N")
-            inspect("dynamic create", 2, False)
+            inspect_run("dynamic create", 2, False)
             command("stop", "cluster", marker, "-y")
             command("start", "cluster", marker, "-r", 3, "-J", jmx, "-N")
-            inspect("dynamic start with local JMX", 3, True)
+            inspect_run("dynamic start with local JMX", 3, True)
             for count, expected in ((4, 3), (6, 4), (9, 6)):
                 command("scale", "cluster", marker, "-r", count, "-N")
-                inspect(f"dynamic scale to {count}", expected, True)
+                inspect_run(f"dynamic scale to {count}", expected, True)
             before = (config / "cohctl.yaml").read_bytes()
             old_members = members()
             command("restart", "cluster", marker, "-y", "--management-address=0.0.0.0", success=False)
             assert (config / "cohctl.yaml").read_bytes() == before
             assert members() == old_members and marked_processes() == set(old_members.values()), "invalid restart changed running members"
             evidence["invalid_restart"] = {"result": "PASS", "members_before": old_members, "members_after": members(),
-                                           "config_sha256_before_and_after": hashlib.sha256(before).hexdigest(), "no_replacement": True}
+                                           "no_replacement": True}
             command("restart", "cluster", marker, "-y", "-r", 2, "--management-address=localhost", "--jmx-port=0")
             # Restart without -N retains the ordinary single REST selection.
-            record = inspect("restart override persistence / explicit JMX disable", 1, False)
+            record = inspect_run("restart override persistence / explicit JMX disable", 1, False)
             assert len(record["members"]) == 2 and not set(record["members"].values()).intersection(old_members.values()), "restart retained old members"
             record["old_members"] = old_members
             record["all_members_replaced"] = True
@@ -352,11 +346,7 @@ def main():
             assert marker in command("get", "clusters") and output
             saved = (config / "cohctl.yaml").read_text()
             assert "http://127.0.0.1:" in saved and "jmxport: 0" in saved
-            record["saved_config_sha256"] = hashlib.sha256((config / "cohctl.yaml").read_bytes()).hexdigest()
             record["saved_loopback_url_and_jmx_zero"] = True
-            if peer:
-                from f1_remote import qualify
-                qualify(command, inspect, config, marker, interface, http, cluster, jmx, create, set_host, evidence)
             if marked_processes():
                 command("stop", "cluster", marker, "-y", env=no_java)
             deadline = time.monotonic() + 10
@@ -371,7 +361,6 @@ def main():
             if selected.exists():
                 body = selected.read_bytes()
                 evidence["failed_configuration"] = {"encoding": "base64", "original_length": len(body),
-                                                    "sha256": hashlib.sha256(body).hexdigest(),
                                                     "data": base64.b64encode(body).decode()}
             evidence["logs"] = {log.name: log.read_text() for log in sorted((config / "logs" / marker).glob("*.log"))}
             for name, content in evidence["logs"].items():
@@ -408,8 +397,6 @@ def main():
                                    "remaining_marked_pids": remaining, "linux_observed_identities": linux_identities,
                                    "remaining_owned_kernel_processes": kernel_remaining, "observer_errors": observer_errors,
                                    "result": "FAIL" if remaining or kernel_remaining or observer_errors else "PASS"}
-            if peer:
-                peer.close()
             evidence["finished_at"] = datetime.now(timezone.utc).isoformat()
             if remaining or kernel_remaining or observer_errors:
                 evidence["status"] = "FAIL"

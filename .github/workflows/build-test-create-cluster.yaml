@@ -9,12 +9,6 @@ name: CI Test Create Cluster
 
 on:
   workflow_dispatch:
-    inputs:
-      f1_controlled_failure:
-        description: 'Owner-approved failure-artifact exercise after successful tests in all four cells'
-        type: boolean
-        required: false
-        default: false
   push:
     branches-ignore:
       - gh-pages
@@ -25,9 +19,6 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      F1_COHERENCE_VERSION: ${{ matrix.coherenceVersion }}
-      F1_JAVA_VERSION: ${{ matrix.javaVersion }}
 
     strategy:
       fail-fast: false
@@ -80,8 +71,7 @@ jobs:
       run: |
         set -euo pipefail
         mkdir -p build/_output/test-logs
-        python3 scripts/f1-ci-evidence.py --output-dir build/_output/test-logs
-        make cohctl 2>&1 | tee build/_output/test-logs/f1-build.log
+        make cohctl 2>&1 | tee build/_output/test-logs/build.log
 
     - name: Setup Gradle and Run Create Cluster Tests
       shell: bash
@@ -96,20 +86,8 @@ jobs:
         unzip -d "${DIR}/gradle-home" "${INSTALL}/gradle-${VERSION}-bin.zip"
         export GRADLE_HOME=${DIR}/gradle-home/gradle-${VERSION}
         export PATH=$GRADLE_HOME/bin:$PATH
-        export COHCTL_F1_EVIDENCE=build/_output/test-logs/f1-listeners.json
-        COHERENCE_VERSION=${{ matrix.coherenceVersion }} make test-create-cluster 2>&1 | tee build/_output/test-logs/f1-integration.log
-
-    - name: Controlled failure artifact exercise
-      if: ${{ success() && github.event_name == 'workflow_dispatch' && inputs.f1_controlled_failure }}
-      shell: bash
-      run: |
-        echo "Owner-requested artifact failure exercise: CE=${F1_COHERENCE_VERSION} Java=${F1_JAVA_VERSION} run=${GITHUB_RUN_ID} attempt=${GITHUB_RUN_ATTEMPT}" | tee build/_output/test-logs/f1-controlled-failure.txt
-        exit 1
-
-    - name: Capture final candidate and artifact content
-      if: always()
-      shell: bash
-      run: python3 scripts/f1-ci-evidence.py --output-dir build/_output/test-logs --binary bin/cohctl --finalize --job-status '${{ job.status }}'
+        export COHCTL_MANAGEMENT_TEST_OUTPUT=build/_output/test-logs/local-management.json
+        COHERENCE_VERSION=${{ matrix.coherenceVersion }} make test-create-cluster 2>&1 | tee build/_output/test-logs/integration.log
 
     - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       id: failure-artifact

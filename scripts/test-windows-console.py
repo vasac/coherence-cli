@@ -17,7 +17,6 @@ The task directory and copied binaries are trusted against concurrent writers.
 """
 
 import argparse
-import hashlib
 import json
 import os
 from pathlib import Path
@@ -28,7 +27,7 @@ import tempfile
 import time
 import uuid
 
-import f1_platform as native
+import management_platform as native
 
 
 def eventually(check, description, timeout=15):
@@ -57,8 +56,7 @@ def main():
         raise RuntimeError("MISSING COVERAGE: native Windows private-console session required")
     native.prerequisites()
     cli, fixture = str(args.cli.resolve()), str(args.fixture.resolve())
-    evidence = {"platform": native.identity(), "cli_sha256": hashlib.sha256(Path(cli).read_bytes()).hexdigest(),
-                "fixture_sha256": hashlib.sha256(Path(fixture).read_bytes()).hexdigest(), "checks": [], "status": "RUNNING",
+    evidence = {"platform": native.identity(), "checks": [], "status": "RUNNING",
                 "scope": "actual private-console Ctrl-C/Ctrl-Break; Java-shaped process/REST fixture; no close/logoff/shutdown claim"}
     phases = [("start", "delay"), ("start", "readiness"), ("create", "delay"), ("create", "readiness"),
               ("restart", "readiness"), ("restart", "confirmation"), ("scale", "readiness")]
@@ -66,9 +64,9 @@ def main():
         for event, operation, phase in [(event, operation, phase) for event in (0, 1) for operation, phase in phases] + [(0, "start", "success")]:
             record = {"event": "CTRL_C_EVENT" if event == 0 else "CTRL_BREAK_EVENT", "operation": operation, "phase": phase}
             evidence["checks"].append(record)
-            marker = "f1-console-" + uuid.uuid4().hex[:12]
+            marker = "console-test-" + uuid.uuid4().hex[:12]
             old, controller = None, None
-            with tempfile.TemporaryDirectory(prefix="f1-console-", dir=args.scratch_dir) as directory:
+            with tempfile.TemporaryDirectory(prefix="console-test-", dir=args.scratch_dir) as directory:
                 work = Path(directory)
                 shim = work / "bin"
                 shim.mkdir()
@@ -148,9 +146,7 @@ def main():
                         controller.stdin.close()
                     result = json.loads((work / "controller.log").read_text())
                     assert result["argv"] == [str(shim / "cohctl.exe")] + command[1:], "controller changed approved CLI arguments"
-                    record.update(controller=result, command=command, cli_output=output(),
-                                  config_before_sha256=hashlib.sha256(before).hexdigest(),
-                                  config_after_sha256=hashlib.sha256(config.read_bytes()).hexdigest())
+                    record.update(controller=result, command=command, cli_output=output())
                     owned = native.processes(marker)
                     record["owned_after_operation"] = owned
                     if phase == "success":

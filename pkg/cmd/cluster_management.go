@@ -445,8 +445,9 @@ func indirectManagementOption(arg string) bool {
 		arg == "-Xmanagement" || strings.HasPrefix(arg, "-Xmanagement:") || strings.HasPrefix(arg, "-Xoptionsfile=")
 }
 
-// F1 controls stock management and the launch boundary. User code, agents,
-// replacement resources and installed runtimes are trusted, not sandboxed here.
+// Server option validation controls stock management and the launch boundary.
+// User code, agents, replacement resources and installed runtimes are trusted,
+// not sandboxed here.
 func validateServerOptions(source string, args []string, launcher bool) (int, error) {
 	// Inspect raw tokens before consuming operands. In particular, a malformed
 	// VM-only split option must not hide the next reserved property or @file.
