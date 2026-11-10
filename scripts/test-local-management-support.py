@@ -3,35 +3,24 @@
 # Licensed under the Universal Permissive License v 1.0 as shown at
 # https://oss.oracle.com/licenses/upl.
 
-"""Real local protocol controls. These are not distinct-network qualification."""
+"""Regression tests for local management readiness and listener inspection."""
 
 import importlib.util
 import ast
-import hashlib
 import json
 import os
 from pathlib import Path
 import re
 import shlex
-import socket
-import subprocess
-import sys
 import tempfile
 import threading
 import types
 import unittest
-import uuid
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from unittest.mock import patch
 
-from f1_remote import Peer
-import f1_platform as native
+import management_platform as native
 
-spec = importlib.util.spec_from_file_location("f1_peer", Path(__file__).with_name("f1-peer.py"))
-peer = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(peer)
-
-spec = importlib.util.spec_from_file_location("f1_management", Path(__file__).with_name("test-local-management.py"))
+spec = importlib.util.spec_from_file_location("local_management", Path(__file__).with_name("test-local-management.py"))
 management = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(management)
 
@@ -51,7 +40,7 @@ class MembershipReadinessTests(unittest.TestCase):
         tree = ast.parse(source.read_text())
         main = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "main")
         inspect = next(node for node in ast.walk(main) if isinstance(node, ast.FunctionDef) and node.name == "inspect")
-        marker = "f1-membership-control"
+        marker = "management-membership-control"
         expected = {"storage-0": 11050, "storage-1": 11051}
         ports = {"storage-0": 58080, "storage-1": 58081}
         calls = []
@@ -84,24 +73,22 @@ class MembershipReadinessTests(unittest.TestCase):
             def getsockname(self):
                 return ("192.0.2.10", 59999)
 
-        with tempfile.TemporaryDirectory(prefix="f1-membership-control-") as temp:
+        with tempfile.TemporaryDirectory(prefix="management-membership-control-") as temp:
             directory = Path(temp)
             logs = directory / "logs" / marker
             logs.mkdir(parents=True)
-            jar = directory / "classpath.jar"
-            jar.write_bytes(b"controlled identity; no JVM")
             snapshots = {}
             for member, pid in expected.items():
                 (logs / (member + ".log")).write_text(f"HttpAcceptor now listening for connections on 127.0.0.1:{ports[member]}\n")
-                snapshots[pid] = {"pid": pid, "command": f"java -cp {jar} -Dcoherence.cluster={marker} -Dcoherence.member={member}",
+                snapshots[pid] = {"pid": pid, "command": f"java -cp fixture-classpath -Dcoherence.cluster={marker} -Dcoherence.member={member}",
                                   "listeners": [f"127.0.0.1:{ports[member]}"]}
             record = {"checks": []}
             environment = {"members": members, "marked_processes": lambda: set(expected.values()),
                 "native": types.SimpleNamespace(processes=lambda selected: {pid: row["command"] for pid, row in snapshots.items()},
                                                 snapshot=lambda pid: dict(snapshots[pid]), assert_listener_bind=native.assert_listener_bind),
-                "marker": marker, "config": directory, "Path": Path, "hashlib": hashlib, "shlex": shlex, "os": os, "re": re,
+                "marker": marker, "config": directory, "shlex": shlex, "os": os, "re": re,
                 "request": lambda selected: {"clusterName": marker}, "connect": lambda host, port: port == 59999,
-                "interface": "192.0.2.10", "jmx": 58082, "peer": None, "socket": types.SimpleNamespace(socket=Control),
+                "interface": "192.0.2.10", "jmx": 58082, "socket": types.SimpleNamespace(socket=Control),
                 "observer_lock": threading.Lock(), "linux_identities": {}, "evidence": record,
                 "wait_for_rest_membership": wait}
             exec(compile(ast.fix_missing_locations(ast.Module(body=[inspect], type_ignores=[])), str(source), "exec"), environment)
@@ -216,7 +203,7 @@ class ListenerBindTests(unittest.TestCase):
         tree = ast.parse(source.read_text())
         main = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "main")
         inspect = next(node for node in ast.walk(main) if isinstance(node, ast.FunctionDef) and node.name == "inspect")
-        marker, member, pid, port, jmx = "f1-bind-control", "storage-0", 12345, 58080, 58081
+        marker, member, pid, port, jmx = "management-bind-control", "storage-0", 12345, 58080, 58081
 
         class Control:
             def __enter__(self):
@@ -230,14 +217,12 @@ class ListenerBindTests(unittest.TestCase):
             def getsockname(self):
                 return ("192.0.2.10", 59999)
 
-        with tempfile.TemporaryDirectory(prefix="f1-bind-control-") as temp:
+        with tempfile.TemporaryDirectory(prefix="management-bind-control-") as temp:
             directory = Path(temp)
             logs = directory / "logs" / marker
             logs.mkdir(parents=True)
             (logs / (member + ".log")).write_text(f"HttpAcceptor now listening for connections on 127.0.0.1:{port}\n")
-            jar = directory / "classpath-fixture.jar"
-            jar.write_bytes(b"controlled classpath identity; no JVM")
-            command = f"java -cp {jar} -Dcoherence.cluster={marker} -Dcoherence.member={member}"
+            command = f"java -cp fixture-classpath -Dcoherence.cluster={marker} -Dcoherence.member={member}"
             # JMX-only negatives retain a valid REST socket so the JMX assertion
             # itself must reject the wildcard; network observations still match.
             for bind in ("127.0.0.1", "192.0.2.10", "0.0.0.0"):
@@ -250,10 +235,10 @@ class ListenerBindTests(unittest.TestCase):
                             "native": types.SimpleNamespace(processes=lambda selected: {pid: command},
                                                             snapshot=lambda selected: {"pid": pid, "command": command, "listeners": addresses},
                                                             assert_listener_bind=native.assert_listener_bind),
-                            "marker": marker, "config": directory, "Path": Path, "hashlib": hashlib, "shlex": shlex, "os": os, "re": re,
+                            "marker": marker, "config": directory, "shlex": shlex, "os": os, "re": re,
                             "request": lambda selected: {"clusterName": marker},
                             "connect": lambda host, selected: selected == 59999 or (selected in (port, jmx) and bind != "127.0.0.1"),
-                            "interface": "192.0.2.10", "jmx": jmx, "peer": None, "socket": types.SimpleNamespace(socket=Control),
+                            "interface": "192.0.2.10", "jmx": jmx, "socket": types.SimpleNamespace(socket=Control),
                             "subprocess": types.SimpleNamespace(check_output=lambda *a, **kw: f"endpoint:[192.0.2.10:{jmx}] runtime={pid}@control"),
                             "temp": temp, "local_host": bind, "evidence": record,
                             "wait_for_rest_membership": management.wait_for_rest_membership}
@@ -265,111 +250,6 @@ class ListenerBindTests(unittest.TestCase):
                             with self.assertRaisesRegex(AssertionError, "incorrect listener bind"):
                                 environment["inspect"]("incorrect wildcard", 1, True, bind)
                             self.assertEqual(record["checks"], [])
-
-
-class ProtocolTests(unittest.TestCase):
-    def setUp(self):
-        self.token = uuid.uuid4().hex
-        token = self.token
-
-        class Handler(BaseHTTPRequestHandler):
-            def do_GET(self):
-                value = token if self.path == "/" else json.dumps({"clusterName": "owned", "items": [{"memberName": "storage-0", "processName": "123"}]})
-                self.send_response(200)
-                self.end_headers()
-                self.wfile.write(value.encode())
-
-            def log_message(self, *args):
-                pass
-
-        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        self.server.daemon_threads = True
-        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
-        self.thread.start()
-        self.addCleanup(self.close)
-
-    def close(self):
-        self.server.shutdown()
-        self.server.server_close()
-        self.thread.join(timeout=3)
-        self.assertFalse(self.thread.is_alive())
-
-    def query(self):
-        return {"protocol": 1, "nonce": uuid.uuid4().hex, "operation": "probe", "host": "127.0.0.1",
-                "ports": [self.server.server_port], "control_port": self.server.server_port, "control_token": self.token,
-                "rest_ports": [self.server.server_port]}
-
-    def test_positive_identity_and_negative_tcp_with_controls(self):
-        query = self.query()
-        # Keep a bound, non-listening socket so this negative port cannot be reused.
-        with socket.socket() as closed:
-            closed.bind(("127.0.0.1", 0))
-            port = closed.getsockname()[1]
-            query["ports"].append(port)
-            result = peer.exchange(query, "127.0.0.1", None, "java")
-        self.assertEqual(result["nonce"], query["nonce"])
-        self.assertEqual(result["control_before"], self.token)
-        self.assertEqual(result["control_after"], self.token)
-        self.assertTrue(result["tcp"][str(self.server.server_port)])
-        self.assertFalse(result["tcp"][str(port)]["connected"])
-        self.assertEqual(result["rest"][str(self.server.server_port)]["cluster"]["clusterName"], "owned")
-
-    def test_wrong_control_cannot_produce_negative_pass(self):
-        query = self.query()
-        query["control_token"] = "0" * 32
-        with self.assertRaisesRegex(AssertionError, "identity mismatch"):
-            peer.exchange(query, "127.0.0.1", None, "java")
-
-    def test_unassigned_host_is_rejected(self):
-        with self.assertRaises(AssertionError):
-            peer.exchange(self.query(), "192.0.2.1", None, "java")
-
-    def test_identity_needs_no_connection(self):
-        query = dict(self.query(), operation="identity")
-        result = peer.exchange(query, "127.0.0.1", None, "java")
-        self.assertIn("system", result["identity"])
-        self.assertNotIn("tcp", result)
-
-    def test_stdio_protocol_preserves_nonce_and_source_identity(self):
-        query = dict(self.query(), operation="identity")
-        result = subprocess.run([sys.executable, str(Path(__file__).with_name("f1-peer.py")), "--allow-host", "127.0.0.1"],
-                                input=json.dumps(query), capture_output=True, text=True, timeout=10, check=True)
-        response = json.loads(result.stdout)
-        self.assertEqual(response["nonce"], query["nonce"])
-        self.assertEqual(len(response["agent_sha256"]), 64)
-
-    def test_vm_topology_is_named_and_requires_assignment(self):
-        identity = peer.exchange(dict(self.query(), operation="identity"), "127.0.0.1", None, "java")
-        identity["probe_class_sha256"] = "a" * 64
-        config = {"scope": "virtual-machine", "resources": "assigned test guest",
-                  "network_context": "approved test LAN", "argv": ["unused"],
-                  "probe_class_sha256": identity["probe_class_sha256"]}
-        with tempfile.TemporaryDirectory(prefix="f1-vm-metadata-") as directory:
-            path = Path(directory) / "peer.json"
-            path.write_text(json.dumps(config))
-            with patch.object(Peer, "call", return_value=identity):
-                with self.assertRaisesRegex(AssertionError, "virtual-machine topology"):
-                    Peer(path, "127.0.0.1", {})
-                config["virtual_machine_assignment"] = "owner-assigned guest on approved LAN"
-                path.write_text(json.dumps(config))
-                evidence = {}
-                selected = Peer(path, "127.0.0.1", evidence)
-                try:
-                    self.assertEqual(evidence["topology"], "virtual-machine")
-                finally:
-                    selected.close()
-
-    def test_vm_assignment_does_not_clear_physical_host_requirement(self):
-        identity = peer.exchange(dict(self.query(), operation="identity"), "127.0.0.1", None, "java")
-        config = {"scope": "two-host", "resources": "assigned test guest",
-                  "network_context": "approved test LAN", "argv": ["unused"],
-                  "virtual_machine_assignment": "guest only"}
-        with tempfile.TemporaryDirectory(prefix="f1-vm-metadata-") as directory:
-            path = Path(directory) / "peer.json"
-            path.write_text(json.dumps(config))
-            with patch.object(Peer, "call", return_value=identity):
-                with self.assertRaisesRegex(AssertionError, "two physical host"):
-                    Peer(path, "127.0.0.1", {})
 
 
 if __name__ == "__main__":

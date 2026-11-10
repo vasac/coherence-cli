@@ -2,7 +2,7 @@
 # Licensed under the Universal Permissive License v 1.0 as shown at
 # https://oss.oracle.com/licenses/upl.
 
-"""Native PID and TCP inspection for the bounded F1 qualification harnesses."""
+"""Native PID and TCP inspection for management integration tests."""
 
 import json
 import os
@@ -15,9 +15,9 @@ import subprocess
 
 
 def powershell(script, query):
-    environment = dict(os.environ, F1_QUERY=json.dumps(query))
+    environment = dict(os.environ, COHCTL_PROCESS_QUERY=json.dumps(query))
     result = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
-                             "$ErrorActionPreference='Stop'; $q=ConvertFrom-Json $env:F1_QUERY; " + script],
+                             "$ErrorActionPreference='Stop'; $q=ConvertFrom-Json $env:COHCTL_PROCESS_QUERY; " + script],
                             env=environment, capture_output=True, text=True, timeout=20, check=True)
     return json.loads(result.stdout.lstrip("\ufeff"))
 

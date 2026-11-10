@@ -37,7 +37,8 @@ WKA controls cluster discovery and does not select management addresses.
 
 These endpoints have no authentication or encryption. Other users on the same host can access loopback endpoints.
 Metrics and health HTTP listeners, cluster transports, proxies and listeners created by user code are separate surfaces;
-the management bind flags do not restrict them. F1 applies to the stock JDK and Coherence management configuration.
+the management bind flags do not restrict them.
+These management controls apply to the stock JDK and Coherence management configuration.
 The selected runtime, installed defaults, user code, agents and resources are trusted inputs. Custom startup classes,
 operational overrides, replacement management resources/providers and agent-created listeners need a separate review.
 
