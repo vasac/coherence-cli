@@ -134,6 +134,7 @@ backend:
             - "rolling_restarts.adoc"
             - "jsonpath.adoc"
             - "set_cache_attrs.adoc"
+            - "tls_certificate_validation.adoc"
         - type: "HEADER"
           title: "Additional resources"
         - type: "LINK"

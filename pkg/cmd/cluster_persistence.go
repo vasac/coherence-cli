@@ -17,7 +17,7 @@ import (
 )
 
 // Managed saves serialize effective Viper settings. Ordinary configuration writes
-// retain their separate semantics.
+// and F4's raw disk-only migration transaction retain their separate semantics.
 type managedConfigFile interface {
 	io.Writer
 	Name() string

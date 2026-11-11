@@ -486,7 +486,7 @@ test-coherence-shutdown: ## shutdown standalone cluster
 test-cohctl: test-clean gotestsum $(BUILD_PROPS) ## Run the CLI unit tests
 	@echo "Running Coherence CLI tests"
 	CGO_ENABLED=0 $(GOTESTSUM) --format testname --junitfile $(TEST_LOGS_DIR)/cohctl-test.xml \
-	  -- $(GO_TEST_FLAGS) -v -coverprofile=$(COVERAGE_DIR)/cover-unit.out ./pkg/cmd/... ./pkg/utils/...
+	  -- $(GO_TEST_FLAGS) -v -coverprofile=$(COVERAGE_DIR)/cover-unit.out ./pkg/cmd/... ./pkg/utils/... ./pkg/fetcher/...
 	go tool cover -html=$(COVERAGE_DIR)/cover-unit.out -o $(COVERAGE_DIR)/cover-unit.html
 
 # ----------------------------------------------------------------------------------------------------------------------
