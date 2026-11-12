@@ -70,7 +70,7 @@ that the old JVMs exited. Use `cohctl start cluster NAME` for an actually stoppe
 local PIDs reported by that REST endpoint; it does not maintain a PID registry or scan for undiscovered processes.
 
 For the complete checklist, including SSH access, monitoring and TLS migration, see
-xref:../about/upgrading_1_10_15.adoc[Upgrading from 1.10.14].
+xref:../about/upgrading_1_11_0.adoc[Upgrading from 1.10.14].
 
 === Common tasks
 
@@ -604,5 +604,5 @@ can still fail after restart stops the old members.
 === See Also
 
 * xref:clusters.adoc[Clusters]
-* xref:../about/upgrading_1_10_15.adoc[Upgrading from 1.10.14]
+* xref:../about/upgrading_1_11_0.adoc[Upgrading from 1.10.14]
 * xref:monitoring.adoc[Local Monitoring]

@@ -181,10 +181,10 @@ more information on downloading and installing the CLI.
 
 ## Upgrading from 1.10.14
 
-Preparing for **1.10.15**? Read the [upgrade checklist](docs/about/upgrading_1_10_15.adoc)
+Preparing for **1.11.0**? Read the [upgrade checklist](docs/about/upgrading_1_11_0.adoc)
 before restarting local development clusters, reinitializing monitoring, or updating TLS-related scripts.
 It explains automatic migrations and the steps you need to take. See also the
-[1.10.15 release notes](release-notes/1.10.15.md). These describe the upcoming release;
+[1.11.0 release notes](release-notes/1.11.0.md). These describe the upcoming release;
 published versions are listed on [GitHub Releases](https://github.com/oracle/coherence-cli/releases).
 
 ## Getting Started

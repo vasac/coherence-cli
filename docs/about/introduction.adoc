@@ -26,8 +26,8 @@ The CLI supports Management over REST connections to Coherence Community Edition
 See the https://github.com/oracle/coherence-cli#supported-coherence-versions[README] for minimum patch levels
 and the scope of the repository's compatibility checks. Available operations depend on the server version and edition.
 
-For the upcoming 1.10.15 changes, start with xref:upgrading_1_10_15.adoc[Upgrading from 1.10.14]
-and the https://github.com/oracle/coherence-cli/blob/main/release-notes/1.10.15.md[1.10.15 release notes].
+For the upcoming 1.11.0 changes, start with xref:upgrading_1_11_0.adoc[Upgrading from 1.10.14]
+and the https://github.com/oracle/coherence-cli/blob/main/release-notes/1.11.0.md[1.11.0 release notes].
 Notes for published CLI versions are available on https://github.com/oracle/coherence-cli/releases[GitHub Releases].
 
 NOTE: The CLI does not replace current management and monitoring tools such as the https://github.com/oracle/coherence-visualvm[Coherence VisualVM Plugin],
@@ -55,7 +55,7 @@ The CLI complements your existing Coherence management tools and allows you to:
 
 == Next Steps
 
-* xref:upgrading_1_10_15.adoc[Upgrading from 1.10.14]
+* xref:upgrading_1_11_0.adoc[Upgrading from 1.10.14]
 * xref:../installation/installation.adoc[Install the Coherence CLI]
 * xref:quickstart.adoc[Run the Quick Start]
 * xref:../reference/overview.adoc[Explore the Command Reference]

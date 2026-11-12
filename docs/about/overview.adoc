@@ -12,8 +12,8 @@
 
 == Get Going
 
-Upgrading an existing installation? Read xref:upgrading_1_10_15.adoc[Upgrading from 1.10.14]
-for the upcoming 1.10.15 changes and the actions to take before restarting clusters or replacing monitoring files.
+Upgrading an existing installation? Read xref:upgrading_1_11_0.adoc[Upgrading from 1.10.14]
+for the upcoming 1.11.0 changes and the actions to take before restarting clusters or replacing monitoring files.
 
 [PILLARS]
 ====

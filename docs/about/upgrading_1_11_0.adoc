@@ -7,12 +7,12 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 = Upgrading from 1.10.14
-:description: Prepare for Coherence CLI 1.10.15 management, monitoring, TLS and installation changes
+:description: Prepare for Coherence CLI 1.11.0 management, monitoring, TLS and installation changes
 :keywords: oracle coherence, coherence-cli, upgrade, management, monitoring, tls
 
 == Upgrading from 1.10.14
 
-This guide describes the upcoming *1.10.15* behavior. Check
+This guide describes the upcoming *1.11.0* behavior. Check
 https://github.com/oracle/coherence-cli/releases[GitHub Releases] for published versions.
 
 The local cluster changes apply to development clusters created with `cohctl create cluster`.
@@ -42,7 +42,7 @@ These endpoints have no authentication or encryption; other users on the same ho
 Metrics, health, cluster transports, user code and custom management providers require separate configuration and review.
 
 Existing running clusters retain their old exposure until restarted. Legacy saved cluster records have no JMX port,
-so the first start or restart with 1.10.15 selects loopback REST and disables JMX unless you explicitly enable it.
+so the first start or restart with 1.11.0 selects loopback REST and disables JMX unless you explicitly enable it.
 For an existing cluster named `local`, choose one of these commands:
 
 [source,bash]
@@ -178,7 +178,7 @@ cohctl set ignore-certs true
 cohctl add cluster dev -u https://dev.example.com:30000/management/coherence/cluster
 ----
 
-*With 1.10.15*, if an exception is still necessary and you have independently established the server's identity:
+*With 1.11.0*, if an exception is still necessary and you have independently established the server's identity:
 
 [source,bash]
 ----

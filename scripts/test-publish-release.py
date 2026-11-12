@@ -25,7 +25,7 @@ WORKFLOW = (SCRIPTS.parent / ".github/workflows/release.yml").read_text()
 NAME = "Create, validate and publish release"
 STEP = WORKFLOW.split(f"    - name: {NAME}\n", 1)[1].split("    - name: ", 1)[0]
 COMMAND = STEP.split("      run: ", 1)[1].strip()
-VERSION = "1.10.15"
+VERSION = "1.11.0"
 NOTES = (f"# Coherence CLI {VERSION}\n\n"
          "## Upgrade actions\n\n"
          "* Review TLS exceptions — keep `false` when certificates are trusted.\n"
