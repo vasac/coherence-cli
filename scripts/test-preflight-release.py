@@ -103,7 +103,7 @@ else:
                         GH_CONFIG_DIR=str(self.config), GH_PROMPT_DISABLED="1",
                         FIXTURE=str(self.fixture), EVENTS=str(self.events))
         self.publisher = HELPER.Publisher(str(self.gh), REPOSITORY, VERSION, self.sha,
-                                          self.env, self.root)
+                                          self.env, self.root, "unused notes")
         self.http_events = []
         self.http_posts = []
         if REAL_GH:

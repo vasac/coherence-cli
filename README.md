@@ -25,6 +25,7 @@ https://oss.oracle.com/licenses/upl.
 * [Overview](#overview)
 * [Why use the Coherence CLI?](#why-use-the-coherence-cli)
 * [Install the CLI](#install-the-cli)
+* [Upgrading from 1.10.14](#upgrading-from-11014)
 * [Getting Started](#getting-started)
 * [Supported Coherence Versions](#supported-coherence-versions)
 * [Get Involved](#need-more-help-have-a-suggestion-come-and-say-hello)
@@ -64,6 +65,9 @@ The Coherence CLI is available for macOS, Linux and Windows for x86 and Arm base
 
 On Linux, the installer downloads the release checksum manifest and verifies the selected binary before making it executable or copying it to `/usr/local/bin`:
 
+<details>
+<summary>Show automatic Linux installation commands</summary>
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/oracle/coherence-cli/main/scripts/install.sh | bash
 ```
@@ -73,7 +77,12 @@ When you install the CLI, normally administrative privileges are required as the
 If you do not want to copy to `/usr/local/bin` automatically, you can set the following environment variable `export COPY=false`, before running the above to download only and then
 manually copy to your desired location.
 
-As a first-class alternative to piping the installer into Bash, download and verify the Linux artifact manually:
+</details>
+
+Alternatively, download and verify the Linux artifact manually without running the installer:
+
+<details>
+<summary>Show manual Linux download and checksum verification commands</summary>
 
 ```bash
 (
@@ -110,6 +119,8 @@ chmod u+x "${ASSET}"
 mv -- "${ASSET}" "${DESTINATION}"
 )
 ```
+
+</details>
 
 ### Windows
 
@@ -168,6 +179,14 @@ Release checksums detect corruption or mismatched downloads. Because the manifes
 See the [Install guide](https://docs.coherence.community/coherence-cli/docs/latest/docs/installation/installation) for
 more information on downloading and installing the CLI.
 
+## Upgrading from 1.10.14
+
+Preparing for **1.10.15**? Read the [upgrade checklist](docs/about/upgrading_1_10_15.adoc)
+before restarting local development clusters, reinitializing monitoring, or updating TLS-related scripts.
+It explains automatic migrations and the steps you need to take. See also the
+[1.10.15 release notes](release-notes/1.10.15.md). These describe the upcoming release;
+published versions are listed on [GitHub Releases](https://github.com/oracle/coherence-cli/releases).
+
 ## Getting Started
 
 Documentation for the Coherence CLI is available [here](https://docs.coherence.community/coherence-cli/docs/latest)
@@ -183,6 +202,7 @@ The CLI supports and is certified against the following Community and Commercial
 * 24.09+
 * 22.06+
 * 14.1.2-0-+
+* 15.1.1-0-*
 
 > Note: As CE 14.1.2-0-0 is out, CE 14.1.1-0+ is no longer supported or tested. Please use CE 14.1.2-0+
 
@@ -191,6 +211,7 @@ The CLI supports and is certified against the following Community and Commercial
 * 14.1.1.0.x - minimum patch level of 14.1.1.0.5+ required
 * 14.1.1.2206.x Feature Pack
 * 14.1.2.0.x
+* 15.1.1.0.x
 
 > Note: If you are on a patch set below the minimum recommended above, then CLI may work, but some functionality may not be available. It
 > is always recommended to upgrade to the latest Coherence patch as soon as you are able to.

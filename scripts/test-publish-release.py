@@ -26,6 +26,10 @@ NAME = "Create, validate and publish release"
 STEP = WORKFLOW.split(f"    - name: {NAME}\n", 1)[1].split("    - name: ", 1)[0]
 COMMAND = STEP.split("      run: ", 1)[1].strip()
 VERSION = "1.10.15"
+NOTES = (f"# Coherence CLI {VERSION}\n\n"
+         "## Upgrade actions\n\n"
+         "* Review TLS exceptions — keep `false` when certificates are trusted.\n"
+         '* Preserve literal $(touch injected), `commands`, and "quoted" text.\n')
 REPOSITORY = "fixture-owner/fixture-repo"
 NAMES = [f"cohctl-{VERSION}-linux-amd64", f"cohctl-{VERSION}-linux-arm64", f"cohctl-{VERSION}-linux-386",
          f"cohctl-{VERSION}-windows-amd64.exe", f"cohctl-{VERSION}-windows-arm64.exe",
@@ -64,7 +68,10 @@ extra = []
 if args[:2] == ['release', 'create']:
     assert args == ['release', 'create', version, '--repo', 'github.com/' + repo,
                     '--verify-tag', '--draft', '--prerelease=false', '--target', sha,
-                    '--title', 'Coherence CLI - ' + version, '--notes', 'Coherence CLI Release ' + version], args
+                    '--title', 'Coherence CLI - ' + version, '--notes-file', args[-1]], args
+    notes_file = pathlib.Path(args[-1])
+    assert notes_file.is_absolute() and notes_file.parent == config.parent
+    assert notes_file.read_text(encoding='utf-8') == s['notes']
     op = 'create'
 else:
     assert args[:5] == ['api', '--hostname', 'github.com', '--method', args[4]], args
@@ -135,7 +142,7 @@ if op == 'create':
         stop()
     s['release'] = dict(id=42, url=url, upload_url=upload + '{?name,label}', html_url=html,
                         tag_name=version, target_commitish=sha, name='Coherence CLI - ' + version,
-                        body='Coherence CLI Release ' + version, draft=True, prerelease=False)
+                        body=notes_file.read_text(encoding='utf-8'), draft=True, prerelease=False)
     if f.get('change_staged'):
         pathlib.Path(s['assets'], f['change_staged']).write_bytes(b'changed after validation')
     if f.get('seed_asset'):
@@ -223,6 +230,11 @@ class Publication(unittest.TestCase):
         self.repo = self.root / "checkout space $(touch injected)"
         self.repo.mkdir()
         subprocess.run(["git", "init", "--quiet", str(self.repo)], check=True)
+        self.notes = self.repo / "release-notes" / f"{VERSION}.md"
+        self.notes.parent.mkdir()
+        self.notes.write_text(NOTES, encoding="utf-8")
+        self.expected_notes = NOTES.strip()
+        subprocess.run(["git", "add", "release-notes"], cwd=self.repo, check=True)
         subprocess.run(["git", "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
                         "-c", "commit.gpgsign=false", "commit", "--quiet", "--allow-empty", "-m", "fixture"],
                        cwd=self.repo, check=True)
@@ -253,9 +265,11 @@ class Publication(unittest.TestCase):
         (no_gh / "gh").chmod(0o700)
         self.local_git = self.root / "local Git isolation marker"
         (no_gh / "git").write_text(f'''#!{sys.executable}
-import os, pathlib, sys
+import os, pathlib, re, sys
 assert (sys.argv[1:] == ['rev-parse', '--verify', 'HEAD^{{commit}}'] or
-        len(sys.argv) == 3 and sys.argv[1] == 'check-ref-format')
+        len(sys.argv) == 3 and sys.argv[1] == 'check-ref-format' or
+        len(sys.argv) == 3 and sys.argv[1] == 'show' and
+        re.fullmatch(r'[0-9a-f]{{40}}:release-notes/[0-9A-Za-z][0-9A-Za-z._-]*\\.md', sys.argv[2]))
 assert not any(k.startswith(('GH_', 'GITHUB_')) for k in os.environ)
 pathlib.Path({str(self.local_git)!r}).touch()
 os.execv({shutil.which('git')!r}, [{shutil.which('git')!r}] + sys.argv[1:])
@@ -284,7 +298,7 @@ os.execv({shutil.which('git')!r}, [{shutil.which('git')!r}] + sys.argv[1:])
         self.public.unlink(missing_ok=True)
         initial = dict(repo=REPOSITORY, version=VERSION, sha=self.sha, names=NAMES, mimes=MIMES,
                        assets=str(self.assets), fault=fault or {}, release=None, remote_assets=[],
-                       bytes={}, events=[], configs=[])
+                       bytes={}, events=[], configs=[], notes=self.expected_notes)
         self.state_path.write_text(json.dumps(initial))
         # A harmless marker models the subsequent public verification step.
         # Separate checksum tests run the actual unauthenticated verifier command
@@ -311,6 +325,50 @@ os.execv({shutil.which('git')!r}, [{shutil.which('git')!r}] + sys.argv[1:])
         self.assertNotIn("Release published:", result.stdout)
         return result
 
+    def commit_notes(self, data):
+        self.notes.write_bytes(data)
+        subprocess.run(["git", "add", "release-notes"], cwd=self.repo, check=True)
+        subprocess.run(["git", "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+                        "-c", "commit.gpgsign=false", "commit", "--quiet", "-m", "update notes"],
+                       cwd=self.repo, check=True)
+        self.sha = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=self.repo, text=True).strip()
+        self.env["RELEASE_SHA"] = self.sha
+
+    def test_repository_release_notes_are_published(self):
+        data = (SCRIPTS.parent / "release-notes" / f"{VERSION}.md").read_bytes()
+        self.commit_notes(data)
+        self.expected_notes = data.decode("utf-8").strip()
+        result = self.invoke()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.state["release"]["body"], self.expected_notes)
+
+    def test_notes_come_from_release_commit_not_working_tree(self):
+        self.notes.write_text("Uncommitted changes must not be published.")
+        result = self.invoke()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.state["release"]["body"], NOTES.strip())
+        self.assertNotIn("Uncommitted", self.state["release"]["body"])
+
+    def test_missing_notes_stop_before_cli(self):
+        self.env.update(RELEASE_VERSION="1.10.16", RELEASE_REF="refs/tags/1.10.16")
+        result = self.failed()
+        self.assertIn("Cannot read release-notes/1.10.16.md", result.stderr)
+        self.assertEqual(self.state["events"], [])
+
+    def test_invalid_committed_notes_stop_before_cli(self):
+        for data in (b"", b" \n", b"# Coherence CLI 1.10.16\n\nWrong version\n",
+                     f"# Coherence CLI {VERSION}\n\n".encode(), b"\xffinvalid UTF-8",
+                     f"Coherence CLI Release {VERSION}".encode()):
+            with self.subTest(data=data):
+                self.commit_notes(data)
+                self.failed()
+                self.assertEqual(self.state["events"], [])
+
+    def test_notes_mutation_after_downloads_prevents_publication(self):
+        self.failed({"bad_release": {"body": self.expected_notes + "\nChanged"}, "at": 2})
+        self.assertTrue(all("download:" + n in self.state["events"] for n in NAMES))
+        self.assertNotIn("publish", self.state["events"])
+
     def test_success_preserves_exact_names_bytes_mime_metadata_and_sequence(self):
         before = {p.name: p.read_bytes() for p in self.assets.iterdir()}
         result = self.invoke()
@@ -321,6 +379,7 @@ os.execv({shutil.which('git')!r}, [{shutil.which('git')!r}] + sys.argv[1:])
         self.assertEqual({p.name: p.read_bytes() for p in self.assets.iterdir()}, before)
         self.assertFalse(self.state["release"]["draft"])
         self.assertFalse(self.state["release"]["prerelease"])
+        self.assertEqual(self.state["release"]["body"], self.expected_notes)
         self.assertTrue(self.public.exists())
         self.assertTrue(self.local_git.exists())
         events = self.state["events"]
@@ -342,7 +401,7 @@ os.execv({shutil.which('git')!r}, [{shutil.which('git')!r}] + sys.argv[1:])
                 self.assertLess(self.state["events"].index("releases"), self.state["events"].index("create"))
                 self.assertEqual([e for e in self.state["events"] if e in WRITES], WRITES)
                 self.assertEqual(self.state["release"]["name"], "Coherence CLI - " + VERSION)
-                self.assertEqual(self.state["release"]["body"], "Coherence CLI Release " + VERSION)
+                self.assertEqual(self.state["release"]["body"], self.expected_notes)
                 self.assertNotIn("Discarded generated", result.stdout + result.stderr)
 
     def test_unverified_authority_stops_publication_before_any_write(self):
@@ -405,7 +464,8 @@ os.execv({shutil.which('git')!r}, [{shutil.which('git')!r}] + sys.argv[1:])
         created = {"id": 42, "tag_name": VERSION, "html_url": url, "draft": True}
         for visible in (True, False):
             with self.subTest(visible=visible):
-                publisher = HELPER.Publisher(str(self.gh), REPOSITORY, VERSION, self.sha, {}, self.root)
+                publisher = HELPER.Publisher(str(self.gh), REPOSITORY, VERSION, self.sha, {}, self.root,
+                                             self.expected_notes)
                 responses = [[[]]] * 4 + [[[created]] if visible else [[]]]
                 with mock.patch.object(publisher, "api", side_effect=responses) as api, \
                         mock.patch.object(HELPER.time, "sleep") as sleep, \
@@ -437,7 +497,8 @@ os.execv({shutil.which('git')!r}, [{shutil.which('git')!r}] + sys.argv[1:])
                      subprocess.TimeoutExpired("fixture", 600)]
         for response in responses:
             with self.subTest(response=response):
-                publisher = HELPER.Publisher(str(self.gh), REPOSITORY, VERSION, self.sha, {}, self.root)
+                publisher = HELPER.Publisher(str(self.gh), REPOSITORY, VERSION, self.sha, {}, self.root,
+                                             self.expected_notes)
                 with mock.patch.object(publisher, "api", side_effect=[response]) as api, \
                         mock.patch.object(HELPER.time, "sleep") as sleep, \
                         mock.patch("sys.stdout", new_callable=io.StringIO):
@@ -606,7 +667,8 @@ os.execv({shutil.which('git')!r}, [{shutil.which('git')!r}] + sys.argv[1:])
         path.write_bytes(original)
 
     def test_cli_timeout_and_signal_are_failures(self):
-        publisher = HELPER.Publisher(str(self.gh), REPOSITORY, VERSION, self.sha, {}, self.root)
+        publisher = HELPER.Publisher(str(self.gh), REPOSITORY, VERSION, self.sha, {}, self.root,
+                                     self.expected_notes)
         with mock.patch.object(HELPER.subprocess, "run", side_effect=subprocess.TimeoutExpired("fixture", 600)) as run:
             for arguments, timeout in (({}, 600), ({"timeout": 300}, 300)):
                 with self.assertRaises(subprocess.TimeoutExpired):

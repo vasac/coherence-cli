@@ -72,10 +72,25 @@ def staged_assets(directory, version):
     return assets
 
 
+def release_notes(version, sha, env):
+    # Read the versioned source from the verified commit, not a possibly edited
+    # working file. A missing source is a release error, never a placeholder.
+    source = f"{sha}:release-notes/{version}.md"
+    result = subprocess.run(["git", "show", source], env=env, stdin=subprocess.DEVNULL,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=300)
+    require(result.returncode == 0, f"Cannot read release-notes/{version}.md from the release commit.")
+    body = result.stdout.decode("utf-8").strip()
+    heading = f"# Coherence CLI {version}\n"
+    require(body.startswith(heading) and bool(body[len(heading):].strip()),
+            "Release notes must start with the matching version heading and contain release details.")
+    return body
+
+
 class Publisher:
-    def __init__(self, gh, repository, version, sha, env, temporary):
+    def __init__(self, gh, repository, version, sha, env, temporary, notes):
         self.gh, self.repository, self.version, self.sha = gh, repository, version, sha
         self.env, self.temporary = env, temporary
+        self.notes = notes
         self.prefix = f"repos/{repository}"
         self.identity = None
         self.phase = "input validation"
@@ -168,7 +183,7 @@ class Publisher:
         require(release.get("tag_name") == self.version
                 and release.get("target_commitish") == self.sha
                 and release.get("name") == f"Coherence CLI - {self.version}"
-                and release.get("body") == f"Coherence CLI Release {self.version}"
+                and release.get("body") == self.notes
                 and release.get("draft") is draft and release.get("prerelease") is False,
                 "Release metadata does not match the expected release state.")
         return identity
@@ -241,6 +256,8 @@ class Publisher:
                                "no further writes are allowed.")
 
     def publish(self, assets, ref):
+        notes_file = self.temporary / "release-notes.md"
+        notes_file.write_text(self.notes, encoding="utf-8")
         # One complete remote gate follows all local input checks.
         # This is not an atomic lock. --verify-tag also checks at creation time.
         self.phase = "release identity and absence validation"
@@ -253,7 +270,7 @@ class Publisher:
             "release", "create", self.version, "--repo", f"github.com/{self.repository}",
             "--verify-tag", "--draft", "--prerelease=false", "--target", self.sha,
             "--title", f"Coherence CLI - {self.version}",
-            "--notes", f"Coherence CLI Release {self.version}"]).decode("utf-8").strip()
+            "--notes-file", str(notes_file)]).decode("utf-8").strip()
         # gh create prints the new release URL. Bind the following reads/writes
         # to that exact response and ID; never resume a draft found only by tag.
         require(created_url.startswith(f"https://github.com/{self.repository}/releases/tag/")
@@ -319,6 +336,7 @@ def main():
     git_output(["check-ref-format", ref], env)
     require(object_sha(git_output(["rev-parse", "--verify", "HEAD^{commit}"], env).strip()) == sha,
             "Checked-out commit does not match the triggering commit.")
+    notes = release_notes(version, sha, env)
     assets = staged_assets(Path(required_env("RELEASE_ASSETS")), version)
     runner = Path(required_env("RUNNER_TEMP"))
     require(runner.is_absolute() and runner.is_dir(), "RUNNER_TEMP must be an absolute existing directory.")
@@ -332,7 +350,7 @@ def main():
         config = temporary / "config"
         config.mkdir()
         env["GH_CONFIG_DIR"] = str(config)
-        publisher = Publisher(gh, repository, version, sha, env, temporary)
+        publisher = Publisher(gh, repository, version, sha, env, temporary, notes)
         try:
             publisher.publish(assets, ref)
         except BaseException:

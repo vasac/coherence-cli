@@ -13,7 +13,8 @@ cancelling a release in progress.
    Check their exact names and hashes before publication.
 3. Check the workflow repository, triggering tag and checked-out commit.
    Require a valid Git tag ref that exactly matches the supported CLI version.
-   Recheck the staged names, regular files
+   Load `release-notes/VERSION.md` from the checked commit and require a matching
+   version heading and nonempty details. Recheck the staged names, regular files
    and hashes before contacting GitHub.
 4. Run one remote identity, authority and absence gate immediately before draft
    creation. Verify the repository and resolve the remote tag to the checked
@@ -25,14 +26,15 @@ cancelling a release in progress.
    release-list pages and reject any existing release for the tag, including
    drafts. An API error or malformed response fails the check.
    Create one draft with `gh release create --verify-tag`, targeting the checked
-   commit with `prerelease=false`, title `Coherence CLI - VERSION` and body
-   `Coherence CLI Release VERSION`. Bind subsequent
+   commit with `prerelease=false`, title `Coherence CLI - VERSION` and the
+   versioned notes as its body, supplied through `--notes-file`. Bind subsequent
    writes to the returned URL and matching release ID, and require the new draft
    to have no assets.
 5. Upload the seven staged files with explicit names and Content-Type values.
    Check asset IDs, names, sizes, empty labels, states and MIME types. Download
    all draft assets and compare their hashes, including the manifest hash.
-   Check the complete asset list and release metadata before and after the draft downloads. Publish by release ID, then check
+   Check the complete asset list and release metadata, including the exact notes
+   body, before and after the draft downloads. Publish by release ID, then check
    the published metadata and complete asset list.
 6. Download the public manifest and assets without authentication from the
    workflow repository. Compare the manifest with the generated copy and
@@ -53,6 +55,22 @@ the helper allows five reads in total, with waits of 1, 2, 4 and 8 seconds.
 Each read checks all pages. Conflicting identities, malformed responses and
 API errors stop immediately. Exhausted reads stop before uploads. Creation,
 uploads and publication each run once; the helper does not retry writes.
+
+## Preparing release notes
+
+Commit customer-facing Markdown in `release-notes/VERSION.md` before tagging.
+Begin with `# Coherence CLI VERSION`, followed by the changes, required upgrade
+actions, and relevant limitations. Use absolute links so the body works on
+GitHub Releases; link to the matching version of the documentation. Before
+publication, the README and documentation home identify upcoming changes and
+link to the upgrade guide without claiming that a release has shipped.
+
+The publisher reads the notes from the checked commit using Git. Uncommitted
+edits cannot change the release body. Missing notes, invalid UTF-8, a mismatched
+heading, or an empty body stop publication before any GitHub write. Leading and
+trailing whitespace is trimmed once; the resulting body is checked exactly on
+draft creation, before publication, and after publication. Generated notes from
+the authority probe are still discarded. There is no placeholder fallback.
 
 ## Release assets
 
